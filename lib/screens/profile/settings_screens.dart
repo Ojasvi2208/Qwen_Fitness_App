@@ -54,7 +54,7 @@ class ProfileScreen extends StatelessWidget {
           (title: 'Measurements', icon: Icons.straighten_rounded, route: '/measurements', detail: 'Weight · body fat · circumferences'),
           (title: 'Connected Apps & Devices', icon: Icons.devices_other_rounded, route: '/connected-apps', detail: 'Apple Health · Watch · Oura'),
           (title: 'Notifications', icon: Icons.notifications_rounded, route: '/notification-settings', detail: 'Reminders by category and time'),
-          (title: 'Appearance', icon: Icons.dark_mode_rounded, detail: 'Theme · larger text'),
+          (title: 'Appearance', icon: Icons.dark_mode_rounded, route: null, detail: 'Theme · larger text'),
           (title: 'Privacy', icon: Icons.lock_rounded, route: '/privacy', detail: 'Your data, your control'),
           (title: 'Subscription', icon: Icons.workspace_premium_rounded, route: '/subscription', detail: store.premium ? 'PULSE Pro · yearly' : 'Free plan'),
           (title: 'Help & Support', icon: Icons.help_outline_rounded, route: '/help', detail: 'FAQs · contact · about'),
@@ -129,11 +129,11 @@ class PersonalDetailsScreen extends StatelessWidget {
     return PulseScaffold(
       title: 'Personal Details',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        const TextField(controller: TextEditingController(text: 'Alex Morgan'), decoration: InputDecoration(labelText: 'Full name')),
+        TextField(controller: TextEditingController(text: 'Alex Morgan'), decoration: InputDecoration(labelText: 'Full name')),
         const SizedBox(height: PulseSpacing.m),
-        const TextField(controller: TextEditingController(text: 'alex.morgan@email.com'), decoration: InputDecoration(labelText: 'Email', helperText: 'Changing this sends a verification link.')),
+        TextField(controller: TextEditingController(text: 'alex.morgan@email.com'), decoration: InputDecoration(labelText: 'Email', helperText: 'Changing this sends a verification link.')),
         const SizedBox(height: PulseSpacing.m),
-        const TextField(controller: TextEditingController(text: 'March 2026'), decoration: InputDecoration(labelText: 'Member since', enabled: false)),
+        TextField(controller: TextEditingController(text: 'March 2026'), decoration: InputDecoration(labelText: 'Member since', enabled: false)),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Units (§59)'),
         PulseCard(
@@ -459,7 +459,7 @@ class PrivacyScreen extends StatelessWidget {
               leading: Icon(d.$3, color: scheme.onSurface.withOpacity(0.6)),
               title: Text(d.$1, style: Theme.of(context).textTheme.titleMedium),
               childrenPadding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, PulseSpacing.m),
-              expandedChildren: [
+              children: [
                 Align(alignment: Alignment.centerLeft, child: Text(d.$2, style: Theme.of(context).textTheme.bodyMedium)),
                 const SizedBox(height: PulseSpacing.s),
                 Align(alignment: Alignment.centerLeft, child: Text('Category isolation is enforced in storage; toggling analytics off stops all event tracking.', style: Theme.of(context).textTheme.bodySmall)),
@@ -525,7 +525,7 @@ class HelpScreen extends StatelessWidget {
               leading: const Icon(Icons.help_outline_rounded),
               title: Text(f.$1, style: Theme.of(context).textTheme.titleMedium),
               childrenPadding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, PulseSpacing.m),
-              expandedChildren: [Align(alignment: Alignment.centerLeft, child: Text(f.$2, style: Theme.of(context).textTheme.bodyMedium))],
+              children: [Align(alignment: Alignment.centerLeft, child: Text(f.$2, style: Theme.of(context).textTheme.bodyMedium))],
             ),
           ),
         const SizedBox(height: PulseSpacing.m),

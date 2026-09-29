@@ -124,7 +124,7 @@ class IconButton3 extends StatelessWidget {
       ),
     );
     if (tooltip != null) {
-      button = Tooltip(message: tooltip!, child: Semantics(label: tooltip!, exclude: true, child: button));
+      button = Tooltip(message: tooltip!, child: button);
     }
     return button;
   }

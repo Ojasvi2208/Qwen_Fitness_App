@@ -340,18 +340,20 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
             ]),
           ),
           Expanded(
-            child: switch (_state) {
-              _ScanState.scanning => _viewfinder(),
-              _ScanState.processing => const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 16),
-                    Text('Reading barcode…', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                  ])),
-              _ScanState.found => _found(),
-              _ScanState.notFound => _notFound(),
-            },
+            child: () {
+              switch (_state) {
+                case _ScanState.scanning: return _viewfinder();
+                case _ScanState.processing: return const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 16),
+                      Text('Reading barcode…', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    ]));
+                case _ScanState.found: return _found();
+                case _ScanState.notFound: return _notFound();
+              }
+            }(),
           ),
-        ],
+        ]),
       ),
     );
   }

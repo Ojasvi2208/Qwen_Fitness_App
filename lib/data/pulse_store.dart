@@ -356,11 +356,11 @@ class PulseData {
     (name: 'Mindfulness', icon: Icons.self_improvement_rounded, color: PulsePalette.info, progress: 'Not yet today', on: false),
   ];
 
-  static const insights = <({String title, String body, IconData icon, Color color})>[
-    (title: 'Protein', body: 'You reached at least 90% of your protein goal on 5 of the last 7 days.', icon: Icons.bolt_rounded, color: PulsePalette.protein),
-    (title: 'Activity', body: 'Your average daily steps increased 12% this month.', icon: Icons.trending_up_rounded, color: PulsePalette.steps),
-    (title: 'Consistency', body: 'You\'ve logged meals on 18 of the last 21 days.', icon: Icons.check_circle_rounded, color: PulsePalette.success),
-    (title: 'Hydration', body: 'You hit your water goal 6 days this week — one short of your best week yet.', icon: Icons.water_drop_rounded, color: PulsePalette.water),
+  static const insights = <({String title, String body, String action, IconData icon, Color color})>[
+    (title: 'Protein', body: 'You reached at least 90% of your protein goal on 5 of the last 7 days.', action: 'Keep it up — aim for 7 of 7 this week.', icon: Icons.bolt_rounded, color: PulsePalette.protein),
+    (title: 'Activity', body: 'Your average daily steps increased 12% this month.', action: 'A 10-minute walk would put you close to today\'s step target.', icon: Icons.trending_up_rounded, color: PulsePalette.steps),
+    (title: 'Consistency', body: 'You\'ve logged meals on 18 of the last 21 days.', action: 'Tomorrow is another opportunity to stay consistent.', icon: Icons.check_circle_rounded, color: PulsePalette.success),
+    (title: 'Hydration', body: 'You hit your water goal 6 days this week — one short of your best week yet.', action: 'Log one more glass to set a new personal best.', icon: Icons.water_drop_rounded, color: PulsePalette.water),
   ];
 
   static const notifications = <({String title, String body, String time, IconData icon, Color color})>[

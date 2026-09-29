@@ -204,13 +204,15 @@ bool ensurePremium(BuildContext context, String featureName) {
 
 /// Compact avatar used in headers/profile.
 class PulseAvatar extends StatelessWidget {
-  const PulseAvatar({super.key, this.radius = 20});
+  const PulseAvatar({super.key, this.radius = 20, this.initials = 'AM', this.showPhoto = true});
   final double radius;
+  final String initials;
+  final bool showPhoto;
   @override
   Widget build(BuildContext context) => CircleAvatar(
         radius: radius,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Text('AM',
+        child: Text(initials,
             style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: radius * 0.7,
@@ -238,7 +240,7 @@ class TrendIndicator extends StatelessWidget {
         Icon(positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 14, color: color),
         const SizedBox(width: 2),
         Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
-            style: PulseTypography.label.copyWith(color: color, fontWeight: FontWeight.w600)),
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600).copyWith(color: color)),
       ]),
     );
   }

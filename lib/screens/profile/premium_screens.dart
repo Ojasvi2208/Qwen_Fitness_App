@@ -64,8 +64,8 @@ class _PaywallSheetState extends State<PaywallSheet> {
           AnimatedSwitcher(
             duration: PulseDuration.fast,
             child: _plan == 0
-                ? _priceCard(key: const ValueKey('m'), price: '\$9.99 / month', note: 'Cancel anytime')
-                : _priceCard(key: const ValueKey('y'), price: '\$59.99 / year', note: '≈ \$4.99/month · Cancel anytime'),
+                ? _priceCard(price: '\$9.99 / month', note: 'Cancel anytime')
+                : _priceCard(price: '\$59.99 / year', note: '≈ \$4.99/month · Cancel anytime'),
           ),
           const SizedBox(height: PulseSpacing.l),
           for (final b in _benefits)
@@ -109,7 +109,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
     );
   }
 
-  Widget _priceCard({super.key, required String price, required String note}) => PulseCard(
+  Widget _priceCard({required String price, required String note}) => PulseCard(
         child: Row(children: [
           const ProBadge(label: 'PRO+'),
           const SizedBox(width: PulseSpacing.sm),
