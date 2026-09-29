@@ -101,15 +101,16 @@ class DestructiveButton extends StatelessWidget {
 }
 
 class IconButton3 extends StatelessWidget {
-  const IconButton3({super.key, required this.icon, this.onTap, this.size = 44, this.selected = false});
+  const IconButton3({super.key, required this.icon, this.onTap, this.size = 44, this.selected = false, this.tooltip});
   final IconData icon;
   final VoidCallback? onTap;
   final double size;
   final bool selected;
+  final String? tooltip;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    Widget button = InkWell(
       borderRadius: BorderRadius.circular(PulseRadius.full),
       onTap: onTap ?? () {},
       child: Container(
@@ -122,6 +123,10 @@ class IconButton3 extends StatelessWidget {
         child: Icon(icon, size: 22, color: selected ? scheme.primary : scheme.onSurface.withOpacity(0.72)),
       ),
     );
+    if (tooltip != null) {
+      button = Tooltip(message: tooltip!, child: Semantics(label: tooltip!, exclude: true, child: button));
+    }
+    return button;
   }
 }
 

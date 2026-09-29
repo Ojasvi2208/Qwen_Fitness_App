@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -24,13 +23,13 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<PulseStore>().track('today_viewed');
+    context.pulse.track('today_viewed');
     Future.delayed(const Duration(milliseconds: 900), () => mounted ? setState(() => _loading = false) : null);
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     if (_loading) return const SafeArea(child: DashboardSkeleton());
     return SafeArea(
       child: RefreshIndicator(
@@ -443,7 +442,7 @@ class WaterScreen extends StatelessWidget {
   const WaterScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<PulseStore>();
+    final s = PulseStore.of(context);
     final pct = s.waterLogged / s.goals.waterGoalLiters;
     return PulseScaffold(
       title: 'Water',

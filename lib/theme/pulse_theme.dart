@@ -196,7 +196,7 @@ class PulseTheme {
         titleTextStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: textMain),
         subtitleTextStyle: TextStyle(fontSize: 14, color: textSec),
       ),
-      tabBarTheme: TabBarThemeData(
+      tabBarTheme: TabBarTheme(
         labelColor: scheme.primary,
         unselectedLabelColor: textSec,
         indicatorColor: scheme.primary,

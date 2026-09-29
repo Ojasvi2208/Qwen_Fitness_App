@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../data/pulse_store.dart';
 import '../theme/tokens.dart';
 import '../widgets/pulse_components.dart';
+import '../screens/profile/premium_screens.dart';
 
 /// App-wide provider access + shared UI helpers used by all screens.
 extension PulseCtx on BuildContext {
-  PulseStore get pulse => read<PulseStore>();
+  PulseStore get pulse => PulseStore.of(this);
   void vibrate() => HapticFeedback.lightImpact();
 }
 
@@ -15,7 +16,8 @@ void pulseSnack(BuildContext context, String message, {String? undoLabel, VoidCa
 
 /// Nav/Top — standard screen scaffold with back button & actions.
 class PulseScaffold extends StatelessWidget {
-  const PulseScaffold({super.key, required this.title, required this.body, this.actions, this.bottomBar, this.floatingAction, this.onBack, this.subtitle});
+  const PulseScaffold({super.key, required this.title, required this.body, this.actions, this.bottomBar,
+      this.floatingAction, this.floatingActionButton, this.onBack, this.subtitle});
   final String title;
   final String? subtitle;
   final Widget body;
@@ -23,6 +25,8 @@ class PulseScaffold extends StatelessWidget {
   final Widget? bottomBar;
   final Widget? floatingAction;
   final VoidCallback? onBack;
+  /// Alias accepted for ergonomic parity with Scaffold.floatingActionButton.
+  final Widget? floatingActionButton;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,7 +46,7 @@ class PulseScaffold extends StatelessWidget {
       ),
       body: SafeArea(child: body),
       bottomNavigationBar: bottomBar,
-      floatingActionButton: floatingAction,
+      floatingActionButton: floatingAction ?? floatingActionButton,
     );
   }
 }

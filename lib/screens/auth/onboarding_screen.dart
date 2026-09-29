@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pulse_components.dart';
@@ -37,9 +36,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     HapticFeedback.lightImpact();
-    if (_step == 8) context.read<PulseStore>().track('onboarding_completed');
+    if (_step == 8) context.pulse.track('onboarding_completed');
     setState(() => _step = (_step + 1).clamp(0, _steps));
-    if (_step == _steps) context.read<PulseStore>().track('permissions_step_reached');
+    if (_step == _steps) context.pulse.track('permissions_step_reached');
   }
 
   void _back() => setState(() => _step = (_step - 1).clamp(0, _steps));
@@ -290,7 +289,7 @@ class _PermissionsFlow extends StatelessWidget {
           const SizedBox(height: PulseSpacing.s),
           Center(child: TextButton(onPressed: onFinish, child: const Text('Maybe Later'))),
           SizedBox(height: MediaQuery.sizeOf(context).height * 0.06),
-          Center(child: Text('Skip anything — the app works fully without it.', style: scheme.textTheme.labelMedium)),
+          Center(child: Text('Skip anything — the app works fully without it.', style: Theme.of(context).textTheme.labelMedium)),
         ]),
       ),
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -104,7 +103,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13.5)),
             trailing: Icon(Icons.chevron_right_rounded, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35)),
             onTap: () {
-              context.read<PulseStore>().track('food_detail_viewed');
+              context.pulse.track('food_detail_viewed');
               Navigator.of(context).pushNamed('/food-detail', arguments: (f, meal));
             },
           ),
@@ -119,7 +118,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           for (final m in PulseData.savedMeals)
             SavedMealCard(meal: m, onAdd: () {
               for (final id in m.foodIds) {
-                context.read<PulseStore>().addFood(PulseData.foodById(id), 1, meal);
+                context.pulse.addFood(PulseData.foodById(id), 1, meal);
               }
               pulseSnack(context, '${m.name} added to ${meal.label}', undoLabel: 'Undo',
                   onUndo: () {}, icon: Icons.restaurant_rounded);
@@ -253,7 +252,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             label: 'Add to Diary',
             icon: Icons.add_rounded,
             onTap: () {
-              final store = context.read<PulseStore>();
+              final store = context.pulse;
               store.addFood(f, _servings, _meal);
               Navigator.of(context).pop();
               pulseSnack(context, 'Added to ${_meal.label}',
@@ -424,8 +423,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         ),
         const SizedBox(height: PulseSpacing.l),
         PrimaryButton(label: 'Add to Diary', icon: Icons.add_rounded, onTap: () {
-          context.read<PulseStore>().addFood(f, 1, MealType.snacks);
-          context.read<PulseStore>().track('barcode_product_logged');
+          context.pulse.addFood(f, 1, MealType.snacks);
+          context.pulse.track('barcode_product_logged');
           Navigator.pop(context);
           pulseSnack(context, 'Added to Snacks', undoLabel: 'Undo', onUndo: () {});
         }),
@@ -570,7 +569,7 @@ class _MealScanScreenState extends State<MealScanScreen> {
                   child: Column(children: [
                     GestureDetector(
                       onTap: () {
-                        context.read<PulseStore>().track('meal_scan_photo_taken');
+                        context.pulse.track('meal_scan_photo_taken');
                         setState(() => _stage = _MealScanStage.analyzing);
                         Future.delayed(const Duration(milliseconds: 1600), () => mounted ? setState(() => _stage = _MealScanStage.review) : null);
                       },
@@ -588,7 +587,7 @@ class _MealScanScreenState extends State<MealScanScreen> {
       ]);
 
   Widget _review() {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return Column(children: [
       Expanded(
         child: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -686,7 +685,7 @@ class _VoiceLogScreenState extends State<VoiceLogScreen> with SingleTickerProvid
                 _parsed = false;
                 _transcript = '';
               });
-              context.read<PulseStore>().track('voice_log_started');
+              context.pulse.track('voice_log_started');
               Future.delayed(const Duration(milliseconds: 2200), () {
                 if (!mounted) return;
                 setState(() {
@@ -733,7 +732,7 @@ class _VoiceLogScreenState extends State<VoiceLogScreen> with SingleTickerProvid
             Card(child: ListTile(leading: Icon(p.$3, size: 20, color: scheme.primary), title: Text(p.$1, style: Theme.of(context).textTheme.titleMedium), subtitle: Text(p.$2))),
           const SizedBox(height: PulseSpacing.m),
           PrimaryButton(label: 'Review & Add', icon: Icons.playlist_add_check_rounded, onTap: () {
-            final store = context.read<PulseStore>();
+            final store = context.pulse;
             store.addFood(PulseData.foodById('f5'), 2, MealType.breakfast);
             store.addFood(PulseData.foodById('f16'), 2, MealType.breakfast);
             store.track('voice_log_completed');

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -29,7 +28,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final isToday = _dayOffset == 0;
     return Scaffold(
       appBar: AppBar(
@@ -245,7 +244,7 @@ class _HistoryCalendar extends StatelessWidget {
           const SheetHeader(title: 'Food history', subtitle: 'Dot intensity shows how completely each day was logged.'),
           Row(children: [
             for (final d in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-              Expanded(child: Center(child: Text(d, style: scheme.textTheme.labelMedium))),
+              Expanded(child: Center(child: Text(d, style: Theme.of(context).textTheme.labelMedium))),
           ]),
           const SizedBox(height: PulseSpacing.s),
           Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.s, children: [
@@ -269,13 +268,13 @@ class _HistoryCalendar extends StatelessWidget {
           ]),
           const SizedBox(height: PulseSpacing.m),
           Row(children: [
-            Text('Less', style: scheme.textTheme.labelSmall),
+            Text('Less', style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(width: 6),
             for (final o in [0.15, 0.45, 0.75, 1.0])
               Padding(padding: const EdgeInsets.only(right: 4),
                   child: Container(width: 14, height: 14, decoration: BoxDecoration(color: scheme.primary.withOpacity(o), borderRadius: BorderRadius.circular(3)))),
             const SizedBox(width: 6),
-            Text('More', style: scheme.textTheme.labelSmall),
+            Text('More', style: Theme.of(context).textTheme.labelSmall),
           ]),
         ]),
       ),
@@ -290,7 +289,7 @@ class RecipesScreen extends StatelessWidget {
   const RecipesScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: 'Recipes',
       subtitle: 'Cook once, log forever — nutrition is calculated per serving',
@@ -363,7 +362,7 @@ class RecipeDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = PulseData.recipes.firstWhere((x) => x.name == recipeName, orElse: () => PulseData.recipes[0]);
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: 'Recipe',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -479,7 +478,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
         TextField(controller: _instructions, maxLines: 4, decoration: const InputDecoration(hintText: 'Write steps here…')),
         const SizedBox(height: PulseSpacing.xl),
         PrimaryButton(label: 'Save Recipe', icon: Icons.bookmark_add_rounded, onTap: nameError != null ? null : () {
-          context.read<PulseStore>().track('recipe_created');
+          context.pulse.track('recipe_created');
           Navigator.pop(context);
           pulseSnack(context, 'Recipe saved — find it under Recipes any time.', icon: Icons.menu_book_rounded);
         }),
@@ -493,7 +492,7 @@ class SavedMealsScreen extends StatelessWidget {
   const SavedMealsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     return PulseScaffold(
       title: 'My Meals',
       subtitle: 'Repeatable combos you log in one tap',
@@ -582,8 +581,21 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             for (final slot in const ['Breakfast', 'Lunch', 'Dinner', 'Snack'])
               Draggable<String>(
                 data: slot,
-                feedbackMaterialTapEffect: true,
                 dragAnchorStrategy: pointerDragAnchorStrategy,
+                feedback: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(PulseRadius.m),
+                  child: Container(
+                    width: MediaQuery.sizeOf(context).width - 48,
+                    padding: const EdgeInsets.all(PulseSpacing.m),
+                    color: Theme.of(context).colorScheme.surface,
+                    child: Row(children: [
+                      const Icon(Icons.drag_handle_rounded, size: 18),
+                      const SizedBox(width: PulseSpacing.s),
+                      Text(slot, style: Theme.of(context).textTheme.titleMedium),
+                    ]),
+                  ),
+                ),
                 onDragStarted: () => setState(() => _dragging = slot),
                 onDragEnd: (_) => setState(() => _dragging = null),
                 child: Card(
@@ -705,7 +717,7 @@ class NutritionDetailsScreen extends StatelessWidget {
   const NutritionDetailsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<PulseStore>();
+    final s = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     return PulseScaffold(
       title: 'Nutrition',
@@ -721,7 +733,7 @@ class NutritionDetailsScreen extends StatelessWidget {
               (value: s.fat * 9, color: PulseColors.fat),
             ], center: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('${s.foodKcal.toStringAsFixed(0)}', style: PulseTypography.metricMedium.copyWith(color: scheme.onSurface)),
-              Text('kcal', style: scheme.textTheme.labelSmall),
+              Text('kcal', style: Theme.of(context).textTheme.labelSmall),
             ])),
             const SizedBox(width: PulseSpacing.l),
             Expanded(
@@ -730,7 +742,7 @@ class NutritionDetailsScreen extends StatelessWidget {
                 _legend(context, 'Carbs', PulseColors.carbs, Icons.grain_rounded, '${(s.carbs * 4 / (s.foodKcal == 0 ? 1 : s.foodKcal) * 100).round()}% of calories'),
                 _legend(context, 'Fat', PulseColors.fat, Icons.water_drop_rounded, '${(s.fat * 9 / (s.foodKcal == 0 ? 1 : s.foodKcal) * 100).round()}% of calories'),
                 Text('Distribution of the ${s.foodKcal.toStringAsFixed(0)} calories you\'ve logged today.',
-                    style: scheme.textTheme.bodySmall?.copyWith(fontSize: 13)),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
               ]),
             ),
           ]),

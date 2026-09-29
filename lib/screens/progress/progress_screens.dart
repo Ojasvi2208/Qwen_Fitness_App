@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -24,7 +23,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     if (!store.hasAnyData) {
       return SafeArea(
         child: EmptyState(
@@ -121,7 +120,7 @@ class WeightProgressScreen extends StatelessWidget {
   const WeightProgressScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     return PulseScaffold(
       title: 'Weight',
@@ -158,11 +157,11 @@ class WeightProgressScreen extends StatelessWidget {
             Row(children: [
               Container(width: 14, height: 3, color: scheme.primary),
               const SizedBox(width: 6),
-              Text('Your weight trend', style: scheme.textTheme.labelMedium),
+              Text('Your weight trend', style: Theme.of(context).textTheme.labelMedium),
               const SizedBox(width: PulseSpacing.l),
               Container(width: 14, height: 0, decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.primary.withOpacity(0.4), width: 1.4)))),
               const SizedBox(width: 6),
-              Text('Goal 75 kg', style: scheme.textTheme.labelMedium),
+              Text('Goal 75 kg', style: Theme.of(context).textTheme.labelMedium),
             ]),
           ]),
         ),
@@ -228,7 +227,7 @@ class _LogWeightScreenState extends State<LogWeightScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: 'Log Weight',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.xl), children: [
@@ -283,7 +282,7 @@ class NutritionProgressScreen extends StatelessWidget {
               Expanded(child: _avg(context, '7-day average', '2,084 kcal')),
             ]),
             Text('Bars above the dashed goal line mean surplus days — three of seven were within ±5% of target.',
-                style: scheme.textTheme.bodySmall),
+                style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
         const SizedBox(height: PulseSpacing.l),
@@ -379,7 +378,7 @@ class ActivityProgressScreen extends StatelessWidget {
             _compare(context, 'Workout minutes', 0.08, '+8%'),
             _compare(context, 'Active calories', -0.02, '−2%'),
             Text('Comparison bars show this month relative to last month at the same point in the cycle.',
-                style: scheme.textTheme.bodySmall),
+                style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
         SecondaryButton(label: 'View workout history', icon: Icons.history_rounded,
@@ -739,7 +738,7 @@ class StreaksScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.45)),
             const SizedBox(height: PulseSpacing.s),
             Text('PULSE keeps long-window stats like this alongside streaks so one quiet day never erases your record.',
-                style: scheme.textTheme.bodySmall),
+                style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
         const SizedBox(height: PulseSpacing.l),
@@ -776,7 +775,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     final goals = <({String label, String value, String route, IconData icon})>[
       (label: 'Goal Weight', value: '${store.goals.targetWeightKg.toStringAsFixed(0)} kg', route: '/goal-editor', icon: Icons.monitor_weight_rounded),
@@ -835,7 +834,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
           ),
         const SizedBox(height: PulseSpacing.m),
         Text('PULSE never changes your calorie target silently. Every edit is yours.',
-            style: scheme.textTheme.bodySmall),
+            style: Theme.of(context).textTheme.bodySmall),
       ]),
     );
   }
@@ -856,7 +855,7 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     final scheme = Theme.of(context).colorScheme;
     final newKcal = (2050 + (75 - _target) * 18).round();
     return PulseScaffold(
@@ -870,8 +869,8 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
               Slider(value: _target, min: 60, max: 90, divisions: 60, label: '${_target.toStringAsFixed(1)} kg',
                   onChanged: (v) => setState(() => _target = v)),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Current: ${store.currentWeightKg.toStringAsFixed(1)} kg', style: scheme.textTheme.bodySmall),
-                Text('From 84.5 kg you\'d lose ${(84.5 - _target).toStringAsFixed(1)} kg total', style: scheme.textTheme.bodySmall),
+                Text('Current: ${store.currentWeightKg.toStringAsFixed(1)} kg', style: Theme.of(context).textTheme.bodySmall),
+                Text('From 84.5 kg you\'d lose ${(84.5 - _target).toStringAsFixed(1)} kg total', style: Theme.of(context).textTheme.bodySmall),
               ]),
             ]),
           ),
@@ -880,7 +879,7 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
           PulseSegmented(options: const ['0.25', '0.4', '0.6'], index: _pace == 0.25 ? 0 : _pace == 0.4 ? 1 : 2,
               onChanged: (i) => setState(() => _pace = [0.25, 0.4, 0.6][i])),
           Text('${_pace} kg/week · ≈ ${((store.currentWeightKg - _target) / _pace).ceil()} weeks to goal',
-              style: scheme.textTheme.bodySmall),
+              style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: PulseSpacing.l),
           PrimaryButton(label: 'Preview New Targets', onTap: () => setState(() => _previewStep = 1)),
         ] else ...[

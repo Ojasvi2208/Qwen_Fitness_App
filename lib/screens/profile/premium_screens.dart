@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -33,7 +32,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SafeArea(
       child: SingleChildScrollView(
@@ -125,7 +124,7 @@ class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     return PulseScaffold(
       title: 'Subscription',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -114,7 +113,7 @@ class SocialButtons extends StatelessWidget {
       label: label,
       icon: icon,
       onTap: () {
-        context.read<PulseStore>().track('social_login_tapped', {'provider': label});
+        context.pulse.track('social_login_tapped', {'provider': label});
         Navigator.of(context).pushReplacementNamed('/onboarding-goals');
       });
 }
@@ -173,7 +172,7 @@ class WelcomeScreen extends StatelessWidget {
                         backgroundColor: Colors.white, foregroundColor: PulseColors.primaryDark,
                         minimumSize: const Size(double.infinity, 54)),
                     onPressed: () {
-                      context.read<PulseStore>().track('onboarding_started');
+                      context.pulse.track('onboarding_started');
                       Navigator.of(context).pushNamed('/signup');
                     },
                     child: const Text('Get Started')),
@@ -245,7 +244,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: '',
       body: ListView(padding: const EdgeInsets.fromLTRB(PulseSpacing.xl, 0, PulseSpacing.xl, PulseSpacing.huge), children: [
@@ -368,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: '',
       body: ListView(padding: const EdgeInsets.fromLTRB(PulseSpacing.xl, 0, PulseSpacing.xl, PulseSpacing.huge), children: [

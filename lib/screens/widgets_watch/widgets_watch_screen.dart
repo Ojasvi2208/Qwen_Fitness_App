@@ -46,7 +46,7 @@ class WidgetsWatchScreen extends StatelessWidget {
         ]),
         const SizedBox(height: PulseSpacing.m),
         Text('Watch screens use ≥ 16 pt type, high-contrast fills and the same macro colors as phone. Complications show a single metric ring.',
-            style: scheme.textTheme.bodySmall),
+            style: Theme.of(context).textTheme.bodySmall),
       ]),
     );
   }

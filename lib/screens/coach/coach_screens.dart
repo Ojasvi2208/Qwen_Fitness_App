@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -42,12 +41,12 @@ class _CoachScreenState extends State<CoachScreen> {
       _thread.add(_Msg(true, q));
       _typing = true;
     });
-    context.read<PulseStore>().track('coach_prompt_used');
+    context.pulse.track('coach_prompt_used');
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() {
         _typing = false;
-        _thread.add(_answer(q, context.read<PulseStore>()));
+        _thread.add(_answer(q, context.pulse));
       });
     });
   }
@@ -349,7 +348,7 @@ class NotificationsScreen extends StatelessWidget {
                   child: Icon(n.$3, color: n.$4, size: 19)),
               title: Text(n.$1, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: n.$6 ? FontWeight.w700 : FontWeight.w600)),
               subtitle: Text(n.$2, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14)),
-              trailing: Text(n.$5, style: scheme.textTheme.labelSmall),
+              trailing: Text(n.$5, style: Theme.of(context).textTheme.labelSmall),
               onTap: () => pulseSnack(context, 'Opened: ${n.$1}', icon: Icons.notifications_active_rounded),
             ),
           ),
@@ -358,7 +357,7 @@ class NotificationsScreen extends StatelessWidget {
             onTap: () => Navigator.of(context).pushNamed('/notification-settings')),
         const SizedBox(height: PulseSpacing.s),
         Text('PULSE reminders are supportive by design — they tell you what\'s left, never what you "failed".',
-            style: scheme.textTheme.bodySmall),
+            style: Theme.of(context).textTheme.bodySmall),
       ]),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/tokens.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// PULSE APP STATE — lightweight InheritedNotifier store (no external
@@ -82,6 +83,9 @@ class Goals {
 
 /// App-wide change store.
 class PulseStore extends ChangeNotifier {
+  /// Watch access used across screens: PulseStore.of(context).
+  static PulseStore of(BuildContext context) => PulseStoreAccess.of(context);
+
   // ── Sample user (§84): consistent across every screen ────────────
   final String userName = 'Alex Morgan';
   final String userFirstName = 'Alex';
@@ -323,4 +327,22 @@ class PulsePalette {
   static const Color success = Color(0xFF1E9E6A);
   static const Color warning = Color(0xFFE8A13C);
   static const Color primary = Color(0xFF0E7C6B);
+}
+
+
+// ── Lightweight state wiring (no external dependencies) ────────────
+// PulseScope exposes the app store via InheritedNotifier so that any
+// screen reading `PulseStore.of(context)` rebuilds on notifyListeners().
+class PulseScope extends InheritedNotifier<PulseStore> {
+  const PulseScope({super.key, required PulseStore store, required super.child})
+      : super(notifier: store);
+}
+
+extension PulseStoreAccess on BuildContext {
+  /// Watch access — rebuilds dependents when the store notifies.
+  static PulseStore of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<PulseScope>();
+    assert(scope != null, 'PulseScope missing — wrap MyApp in PulseScope.');
+    return scope!.notifier!;
+  }
 }

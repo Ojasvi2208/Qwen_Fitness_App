@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -14,7 +13,7 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SafeArea(
       child: ListView(padding: const EdgeInsets.fromLTRB(PulseSpacing.m, PulseSpacing.s, PulseSpacing.m, 120), children: [
@@ -126,7 +125,7 @@ class PersonalDetailsScreen extends StatelessWidget {
   const PersonalDetailsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: 'Personal Details',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -305,7 +304,7 @@ class _ConnectedAppsScreenState extends State<ConnectedAppsScreen> {
           ),
         const SizedBox(height: PulseSpacing.m),
         Text('Integration cards are generic representations; each provider\'s own branding appears at connection time.',
-            style: scheme.textTheme.bodySmall),
+            style: Theme.of(context).textTheme.bodySmall),
       ]),
     );
   }
@@ -319,7 +318,7 @@ class _ConnectedAppsScreenState extends State<ConnectedAppsScreen> {
           confirmLabel: 'Disconnect');
       if (!ok || !mounted) return;
     } else {
-      context.read<PulseStore>().track('integration_connected');
+      context.pulse.track('integration_connected');
     }
     setState(() => _apps[name] = (connected: !wasConnected, detail: _apps[name]!.detail, icon: _apps[name]!.icon));
     pulseSnack(context, wasConnected ? '$name disconnected' : '$name connected — initial sync started',
@@ -497,8 +496,8 @@ class PrivacyScreen extends StatelessWidget {
         const SizedBox(height: PulseSpacing.m),
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
-          value: context.watch<PulseStore>().analyticsEnabled,
-          onChanged: (v) { context.read<PulseStore>().setAnalytics(v); },
+          value: PulseStore.of(context).analyticsEnabled,
+          onChanged: (v) { context.pulse.setAnalytics(v); },
           title: const Text('Product analytics', style: TextStyle(fontWeight: FontWeight.w600)),
           subtitle: const Text('Anonymous feature-usage events. Never log contents.'),
         ),
@@ -546,7 +545,7 @@ class AccessibilityScreen extends StatelessWidget {
   const AccessibilityScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     return PulseScaffold(
       title: 'Accessibility',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [

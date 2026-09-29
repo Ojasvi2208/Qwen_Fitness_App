@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -16,7 +15,7 @@ class TrainScreen extends StatelessWidget {
   const TrainScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<PulseStore>();
+    final store = PulseStore.of(context);
     return SafeArea(
       child: ListView(padding: const EdgeInsets.fromLTRB(PulseSpacing.m, PulseSpacing.s, PulseSpacing.m, 120), children: [
         Row(children: [
@@ -229,7 +228,7 @@ class WorkoutDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = PulseData.workoutLibrary.firstWhere((x) => x.name == workoutName, orElse: () => PulseData.workoutLibrary[0]);
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return PulseScaffold(
       title: 'Workout',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -464,7 +463,7 @@ class ExerciseInstructionsScreen extends StatelessWidget {
                 decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(PulseRadius.m)),
                 child: Stack(alignment: Alignment.center, children: [
                   Icon(Icons.animation_rounded, size: 56, color: scheme.primary.withOpacity(0.6)),
-                  Positioned(bottom: 8, right: 12, child: Text('Animation loop', style: scheme.textTheme.labelSmall)),
+                  Positioned(bottom: 8, right: 12, child: Text('Animation loop', style: Theme.of(context).textTheme.labelSmall)),
                 ])),
           ]),
         ),
@@ -516,7 +515,7 @@ class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -604,7 +603,7 @@ class ActivityDetailScreen extends StatelessWidget {
               const Icon(Icons.directions_run_rounded, color: PulseColors.caloriesBurned),
               const SizedBox(width: PulseSpacing.s),
               Expanded(child: Text('Morning Run', style: Theme.of(context).textTheme.titleLarge)),
-              Text('Today · 6:40 AM', style: scheme.textTheme.labelMedium),
+              Text('Today · 6:40 AM', style: Theme.of(context).textTheme.labelMedium),
             ]),
             const SizedBox(height: PulseSpacing.m),
             // Route map placeholder (shown only because GPS was enabled)
@@ -612,7 +611,7 @@ class ActivityDetailScreen extends StatelessWidget {
                 decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(PulseRadius.m)),
                 child: Stack(children: [
                   CustomPaint(size: Size.infinite, painter: _RoutePainter(scheme.primary)),
-                  Positioned(left: 10, bottom: 8, child: Text('Route shown because Location was allowed for tracking', style: scheme.textTheme.labelSmall)),
+                  Positioned(left: 10, bottom: 8, child: Text('Route shown because Location was allowed for tracking', style: Theme.of(context).textTheme.labelSmall)),
                 ])),
             const SizedBox(height: PulseSpacing.m),
             Row(children: [
@@ -695,7 +694,7 @@ class _LogExerciseScreenState extends State<LogExerciseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.read<PulseStore>();
+    final store = context.pulse;
     final minsOk = int.tryParse(_minutes.text) != null && int.parse(_minutes.text) > 0;
     return PulseScaffold(
       title: 'Log Exercise',
@@ -732,7 +731,7 @@ class StepsScreen extends StatelessWidget {
   const StepsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<PulseStore>();
+    final s = PulseStore.of(context);
     final scheme = Theme.of(context).colorScheme;
     final pct = s.stepsToday / s.goals.stepGoal;
     return PulseScaffold(

@@ -13,6 +13,7 @@ class PulseSpacing {
   static const double xs = 4;
   static const double s = 8;
   static const double sm = 12;
+  static const double l = 20; // legacy alias used across screens
   static const double m = 16;
   static const double lg = 20;
   static const double xl = 24;
@@ -181,4 +182,20 @@ class PulseTypography {
   /// Metric/Small — inline stats.
   static const TextStyle metricSmall = TextStyle(
       fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.2);
+}
+
+// ── Semantic palette alias (Board 01): maps nutrition/fitness color
+// names onto the brand palette. Screens reference PulsePalette.*.
+class PulsePalette {
+  const PulsePalette._();
+  static const Color primary = PulseColors.primary;
+  static const Color protein = PulseColors.protein;
+  static const Color fiber = PulseColors.fiber;
+  static const Color steps = PulseColors.steps;
+  static const Color sleep = PulseColors.sleep;
+  static const Color exercise = PulseColors.exercise;
+  static const Color success = PulseColors.success;
+  static const Color warning = PulseColors.warning;
+  static const Color info = PulseColors.info;
+  static const Color water = PulseColors.water;
 }
