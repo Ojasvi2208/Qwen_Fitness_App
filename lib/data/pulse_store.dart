@@ -133,12 +133,6 @@ class PulseStore extends ChangeNotifier {
   String unitsVolume = 'ml'; // ml | oz
   String unitsDistance = 'km'; // km | mi
 
-  // Weight history for Chart/WeightTrend (trendline over daily noise)
-  static final weightHistorySeed = <(DateTime, double)>[
-    (DateTime(2026, 6, 1), 84.5), (DateTime(2026, 6, 15), 83.6), (DateTime(2026, 7, 1), 83.1),
-    (DateTime(2026, 7, 15), 82.4), (DateTime(2026, 8, 1), 81.9), (DateTime(2026, 8, 15), 81.0),
-    (DateTime(2026, 9, 1), 80.6), (DateTime(2026, 9, 15), 80.1), (DateTime(2026, 9, 29), 79.8),
-  ];
   static const weightHistory = <(String, double)>[
     ('Jun 1', 84.5), ('Jun 15', 83.6), ('Jul 1', 83.1), ('Jul 15', 82.4),
     ('Aug 1', 81.9), ('Aug 15', 81.0), ('Sep 1', 80.6), ('Sep 15', 80.1),

@@ -263,7 +263,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         SectionHeader(title: 'Nutrition Facts', actionLabel: 'Per serving', onAction: () {}),
         PulseCard(
           child: Column(children: [
-            for (final row in [
+            for (final row in <(String, String, bool)>[
               ('Calories', '${_v(f.kcalPerServing).toStringAsFixed(0)} kcal', true),
               ('Protein', '${_v(f.protein).toStringAsFixed(1)} g', false),
               ('Total Carbohydrate', '${_v(f.carbs).toStringAsFixed(1)} g', false),
@@ -279,9 +279,9 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 7),
                 child: Row(children: [
-                  Expanded(child: Text(row.$1, style: TextStyle(fontWeight: row.$2 ? FontWeight.w700 : FontWeight.w400, fontSize: row.$2 ? 16 : 15))),
-                  Text(row.$2 ? row.$3 : row.$3,
-                      style: TextStyle(fontWeight: row.$2 ? FontWeight.w800 : FontWeight.w500, fontSize: row.$2 ? 16 : 15)),
+                  Expanded(child: Text(row.$1, style: TextStyle(fontWeight: row.$3 ? FontWeight.w700 : FontWeight.w400, fontSize: row.$3 ? 16 : 15))),
+                  Text(row.$2,
+                      style: TextStyle(fontWeight: row.$3 ? FontWeight.w800 : FontWeight.w500, fontSize: row.$3 ? 16 : 15)),
                 ]),
               ),
           ]),
