@@ -88,7 +88,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 ],
               ),
       ),
-      floatingAction: FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'diary-add',
         backgroundColor: Theme.of(context).colorScheme.primary,
         onPressed: () {
@@ -236,7 +236,7 @@ class _HistoryCalendar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     // levels: 0 none, .5 partial, 1 full logging days
-    const levels = [1, 1, .5, 1, 1, 0, 1, 1, .5, 1, 1, 1, .5, 0, 1, 1, 1, .5, 1, 1, 0];
+    const levels = <double>[1, 1, .5, 1, 1, 0, 1, 1, .5, 1, 1, 1, .5, 0, 1, 1, 1, .5, 1, 1, 0];
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(PulseSpacing.l),
@@ -258,7 +258,7 @@ class _HistoryCalendar extends StatelessWidget {
                     return Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(
-                          color: lv == 0 ? scheme.surfaceContainerHighest : scheme.primary.withOpacity(0.15 + lv * 0.75),
+                          color: lv == 0 ? scheme.surfaceContainerHighest : scheme.primary.withOpacity((0.15 + lv * 0.75).clamp(0.0, 1.0).toDouble()),
                           borderRadius: BorderRadius.circular(PulseRadius.s)),
                       child: Center(child: Text('$i', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: lv > 0.55 ? Colors.white : null))),
                     );
@@ -449,7 +449,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
           PulseStepper(value: _servings.toDouble(), min: 1, max: 24, unit: '', onChanged: (v) => setState(() => _servings = v.round())),
         ]),
         const SizedBox(height: PulseSpacing.l),
-        SectionHeader(title: 'Ingredients', actionLabel: 'Import Recipe', onAction: () => pulseSnack(context, 'Paste a URL or import from a supported source.', icon: Icons.import_rounded)),
+        SectionHeader(title: 'Ingredients', actionLabel: 'Import Recipe', onAction: () => pulseSnack(context, 'Paste a URL or import from a supported source.', icon: Icons.login_rounded)),
         for (final ing in _ingredients)
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
@@ -563,7 +563,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           onTap: () => pulseSnack(context, 'Suggestions use your goals, preferences and Frequent foods.', icon: Icons.auto_awesome_rounded))],
       body: DragTarget<String>(
         onAccept: (_) {},
-        child: SingleChildScrollView(
+        builder: (_, __, ___) => SingleChildScrollView(
           padding: const EdgeInsets.all(PulseSpacing.m),
           child: Column(children: [
             // horizontal week strip

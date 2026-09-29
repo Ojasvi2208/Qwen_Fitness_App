@@ -136,7 +136,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   static IconData _foodIcon(String name) {
     final n = name.toLowerCase();
-    if (n.contains('yogurt') || n.contains('cottage')) return Icons.bowl_rounded;
+    if (n.contains('yogurt') || n.contains('cottage')) return Icons.restaurant_rounded;
     if (n.contains('chicken') || n.contains('salmon')) return Icons.set_meal_rounded;
     if (n.contains('rice') || n.contains('oat')) return Icons.rice_bowl_rounded;
     if (n.contains('banana') || n.contains('apple') || n.contains('avocado')) return Icons.eco_rounded;
@@ -227,7 +227,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         PulseCard(
           child: Column(children: [
             DropdownButtonFormField<String>(
-              initialValue: f.serving,
+              value: f.serving,
               decoration: const InputDecoration(labelText: 'Serving size'),
               items: [f.serving, 'Half serving (${'0.5'}×)', 'Double serving (2×)']
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -325,7 +325,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     return Scaffold(
       backgroundColor: isDark ? Colors.black : const Color(0xFF101A17),
       body: SafeArea(
-        children: [
+        child: Column(children: [
           Padding(
             padding: const EdgeInsets.all(PulseSpacing.m),
             child: Row(children: [
@@ -517,7 +517,7 @@ enum _MealScanStage { camera, analyzing, review }
 class _MealScanScreenState extends State<MealScanScreen> {
   _MealScanStage _stage = _MealScanStage.camera;
   // Editable recognized items: (name, portion, kcal, protein)
-  final _items = [
+  final List<Map<String, Object>> _items = [
     {'name': 'Grilled chicken', 'portion': '150 g', 'kcal': 248.0, 'protein': 46.0},
     {'name': 'Rice', 'portion': '1 cup', 'kcal': 216.0, 'protein': 5.0},
     {'name': 'Broccoli', 'portion': '1 cup', 'kcal': 55.0, 'protein': 3.7},
@@ -612,12 +612,12 @@ class _MealScanScreenState extends State<MealScanScreen> {
           for (var i = 0; i < _items.length; i++)
             Card(
               child: ListTile(
-                title: Text(_items[i]['name']!, style: Theme.of(context).textTheme.titleMedium),
+                title: Text(_items[i]['name'] as String, style: Theme.of(context).textTheme.titleMedium),
                 subtitle: Text('${_items[i]['portion']} · ${(_items[i]['kcal'] as double).toStringAsFixed(0)} kcal · ${(_items[i]['protein'] as double).toStringAsFixed(0)} g protein'),
                 trailing: Builder(builder: (itemCtx) => PopupMenuButton<String>(
                   tooltip: 'Edit item',
                   onSelected: (v) => setState(() {
-                    if (v == 'half') { _items[i]['kcal'] = (_items[i]['kcal'] as double) / 2; _items[i]['protein'] = (_items[i]['protein'] as double) / 2; _items[i]['portion'] = '½ portion'; }
+                    if (v == 'half') { _items[i]['kcal'] = (_items[i]['kcal'] as double) / 2; _items[i]['protein'] = (_items[i]['protein'] as double) / 2; (_items[i])['portion'] = '½ portion'; }
                     if (v == 'double') { _items[i]['kcal'] = (_items[i]['kcal'] as double) * 2; _items[i]['protein'] = (_items[i]['protein'] as double) * 2; _items[i]['portion'] = '2× portion'; }
                     if (v == 'remove') _items.removeAt(i);
                   }),
@@ -728,7 +728,7 @@ class _VoiceLogScreenState extends State<VoiceLogScreen> with SingleTickerProvid
           ])),
           const SizedBox(height: PulseSpacing.m),
           SectionHeader(title: 'Parsed foods'),
-          for (final p in const [('Eggs × 2', '144 kcal · 12.6 g protein', Icons.egg_alt_rounded), ('Whole wheat toast × 2', '160 kcal · 8 g protein', Icons.bread_clip_rounded), ('Coffee with milk', '35 kcal · 2 g protein', Icons.coffee_rounded)])
+          for (final p in const [('Eggs × 2', '144 kcal · 12.6 g protein', Icons.egg_alt_rounded), ('Whole wheat toast × 2', '160 kcal · 8 g protein', Icons.breakfast_dining_rounded), ('Coffee with milk', '35 kcal · 2 g protein', Icons.coffee_rounded)])
             Card(child: ListTile(leading: Icon(p.$3, size: 20, color: scheme.primary), title: Text(p.$1, style: Theme.of(context).textTheme.titleMedium), subtitle: Text(p.$2))),
           const SizedBox(height: PulseSpacing.m),
           PrimaryButton(label: 'Review & Add', icon: Icons.playlist_add_check_rounded, onTap: () {

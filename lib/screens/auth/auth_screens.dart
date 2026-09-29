@@ -80,17 +80,17 @@ class _SplashPulse extends CustomPainter {
     canvas.drawArc(Rect.fromCircle(center: c, radius: r), -1.9, 3.8 * progress, false, arc);
     // heartbeat line
     final path = Path()
-      ..moveTo(c.x - r * 0.62, c.y)
-      ..lineTo(c.x - r * 0.28, c.y)
-      ..lineTo(c.x - r * 0.12, c.y - r * 0.34)
-      ..lineTo(c.x + 0.04 * r, c.y + r * 0.3)
-      ..lineTo(c.x + 0.18 * r, c.y - r * 0.12)
-      ..lineTo(c.x + 0.3, c.y)
-      ..lineTo(c.x + r * 0.62, c.y);
+      ..moveTo(c.dx - r * 0.62, c.dy)
+      ..lineTo(c.dx - r * 0.28, c.dy)
+      ..lineTo(c.dx - r * 0.12, c.dy - r * 0.34)
+      ..lineTo(c.dx + 0.04 * r, c.dy + r * 0.3)
+      ..lineTo(c.dx + 0.18 * r, c.dy - r * 0.12)
+      ..lineTo(c.dx + 0.3, c.dy)
+      ..lineTo(c.dx + r * 0.62, c.dy);
     canvas.drawPath(path, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.2
-      ..strokeLineJoin = StrokeJoin.round
+      ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round
       ..color = Colors.white);
   }

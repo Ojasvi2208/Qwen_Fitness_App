@@ -308,7 +308,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                 subtitle: Text(it.$2),
                 trailing: Icon(Icons.chevron_right_rounded, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
                 onTap: () {
-                  if (route == '/food-detail') {
+                  if (route != null && route == '/food-detail') {
                     final f = PulseData.foods.firstWhere((x) => x.name == it.$1, orElse: () => PulseData.foods[0]);
                     Navigator.of(context).pushNamed(route, arguments: (f, MealType.snacks));
                   } else if (route != null) {

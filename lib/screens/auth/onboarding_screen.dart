@@ -49,7 +49,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_step >= _steps) return const _PermissionsFlow(onFinish: () => Navigator.of(context).pushNamedAndRemoveUntil('/home', (r) => false));
+    if (_step >= _steps) return _PermissionsFlow(onFinish: () => Navigator.of(context).pushNamedAndRemoveUntil('/home', (r) => false));
     return Scaffold(
       body: SafeArea(
         child: Column(children: [
@@ -64,7 +64,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: TweenAnimationBuilder<double>(
                     tween: Tween(begin: _step / _steps, end: (_step + 1) / _steps),
                     duration: PulseDuration.normal,
-                    child: LinearProgressIndicator(value: (_step + 1) / _steps, minHeight: 6,
+                    builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 6,
                         backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
                   ),
                 ),
@@ -225,7 +225,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: PulseSpacing.sm),
               child: Row(children: [
-                Icon(m.$3, size: 18), const SizedBox(width: PulseSpacing.s),
+                Icon(m.$4, size: 18, color: m.$3), const SizedBox(width: PulseSpacing.s),
                 Expanded(child: Text('${m.$1} ', style: Theme.of(c).textTheme.bodyLarge)),
                 Text(m.$2, style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
               ]),

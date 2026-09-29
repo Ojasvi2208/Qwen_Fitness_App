@@ -86,6 +86,7 @@ class WeightRecord {
   final DateTime date;
   final double kg;
   const WeightRecord(this.date, this.kg);
+  double get weightKg => kg;
 }
 
 /// App-wide change store.
@@ -123,8 +124,15 @@ class PulseStore extends ChangeNotifier {
   /// Weigh-in history (local-first). Seeded with the sample trend so
   /// charts have data on first launch; new entries are appended live.
   final List<WeightRecord> weights = [
-    for (final p in PulseData.weightHistorySeed)
-      WeightRecord(p.$1, p.$2),
+    WeightRecord(DateTime(2026, 6, 1), 84.5),
+    WeightRecord(DateTime(2026, 6, 15), 83.6),
+    WeightRecord(DateTime(2026, 7, 1), 83.1),
+    WeightRecord(DateTime(2026, 7, 15), 82.4),
+    WeightRecord(DateTime(2026, 8, 1), 81.9),
+    WeightRecord(DateTime(2026, 8, 15), 81.0),
+    WeightRecord(DateTime(2026, 9, 1), 80.6),
+    WeightRecord(DateTime(2026, 9, 15), 80.1),
+    WeightRecord(DateTime(2026, 9, 29), 79.8),
   ];
   bool premium = false;
   bool offlineMode = false;
@@ -155,7 +163,7 @@ class PulseStore extends ChangeNotifier {
     double clampP(double v, double g) => (v / g).clamp(0.0, 1.0);
     final nutrition = clampP(foodKcal, goals.calorieGoal) * 0.4 +
         clampP(protein, goals.proteinGoal) * 0.2;
-    final activity = clampP(stepsToday, goals.stepGoal) * 0.2 +
+    final activity = clampP(stepsToday, goals.stepGoal.toDouble()) * 0.2 +
         clampP(waterLogged, goals.waterGoalLiters) * 0.2;
     return ((nutrition + activity) * 100).roundToDouble();
   }
@@ -173,13 +181,13 @@ class PulseStore extends ChangeNotifier {
   }
 
   void addWater(double liters) {
-    waterLogged = (waterLogged + liters).clamp(0, 10);
+    waterLogged = (waterLogged + liters).clamp(0.0, 10.0);
     track('water_logged');
     notifyListeners();
   }
 
-  void logWeight(double kg) {
-    final now = DateTime.now();
+  void logWeight(double kg, {DateTime? date}) {
+    final now = date ?? DateTime.now();
     weights.removeWhere((w) =>
         w.date.year == now.year && w.date.month == now.month && w.date.day == now.day);
     weights.add(WeightRecord(now, kg));
