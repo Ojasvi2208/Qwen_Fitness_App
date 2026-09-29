@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pulse_components.dart';
@@ -64,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     tween: Tween(begin: _step / _steps, end: (_step + 1) / _steps),
                     duration: PulseDuration.normal,
                     child: LinearProgressIndicator(value: (_step + 1) / _steps, minHeight: 6,
-                        backgroundColor: Theme.of(context).dividerColor),
+                        backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
                   ),
                 ),
               ),

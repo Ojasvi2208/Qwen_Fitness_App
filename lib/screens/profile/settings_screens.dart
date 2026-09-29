@@ -37,9 +37,9 @@ class ProfileScreen extends StatelessWidget {
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: PulseColors.secondary.withOpacity(0.14), borderRadius: BorderRadius.circular(PulseRadius.full)),
                       child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.workspace_premium_rounded, size: 13, color: PulseColors.secondaryDark),
+                        Icon(Icons.workspace_premium_rounded, size: 13, color: PulseColors.secondary),
                         SizedBox(width: 4),
-                        Text('PULSE Pro', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: PulseColors.secondaryDark)),
+                        Text('PULSE Pro', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: PulseColors.secondary)),
                       ])),
                 ),
             ])),

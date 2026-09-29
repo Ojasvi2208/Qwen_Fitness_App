@@ -38,7 +38,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(PulseSpacing.l, PulseSpacing.sm, PulseSpacing.l, PulseSpacing.xl),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: scheme.dividerColor, borderRadius: BorderRadius.circular(2)))),
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: scheme.onSurface.withOpacity(0.12), borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: PulseSpacing.xl),
           if (widget.featureName != null) ...[
             Container(

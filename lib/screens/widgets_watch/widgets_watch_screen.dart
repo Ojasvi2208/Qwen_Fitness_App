@@ -34,7 +34,7 @@ class WidgetsWatchScreen extends StatelessWidget {
         SectionHeader(title: 'Large · full day at a glance'),
         const _WidgetLarge(),
         const SizedBox(height: PulseSpacing.xl),
-        Divider(color: scheme.dividerColor),
+        Divider(color: scheme.onSurface.withOpacity(0.12)),
         SectionHeader(title: 'Watch experience'),
         const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.m, children: [
           _WatchTile(title: 'Calories', lines: ['1,340 kcal', '1,020 left'], ring: 0.65, ringColor: PulseColors.accent),

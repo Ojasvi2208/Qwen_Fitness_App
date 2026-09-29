@@ -11,6 +11,26 @@ extension PulseCtx on BuildContext {
   void vibrate() => HapticFeedback.lightImpact();
 }
 
+/// Theme-aware divider helper (ColorScheme lacks dividerColor in Flutter 3.24).
+extension PulseDividerX on BuildContext {
+  Color get dividerColor => Theme.of(this).colorScheme.onSurface.withOpacity(0.12);
+}
+
+String fmtKg(double kg, String unit) => unit == 'lb'
+    ? '${(kg * 2.20462).toStringAsFixed(1)} lb'
+    : '${kg.toStringAsFixed(1)} kg';
+
+String fmtKm(double km, String unit) => unit == 'mi'
+    ? '${(km * 0.621371).toStringAsFixed(2)} mi'
+    : '${km.toStringAsFixed(1)} km';
+
+String fmtMl(double ml, String unit) => unit == 'oz'
+    ? '${(ml / 29.5735).toStringAsFixed(0)} oz'
+    : '${ml.toStringAsFixed(0)} ml';
+
+void pulseTapHaptic() => HapticFeedback.selectionClick();
+
+
 void pulseSnack(BuildContext context, String message, {String? undoLabel, VoidCallback? onUndo, IconData? icon}) =>
     PulseToast.show(context, message, undoLabel: undoLabel, onUndo: onUndo, icon: icon);
 
@@ -196,4 +216,30 @@ class PulseAvatar extends StatelessWidget {
                 fontSize: radius * 0.7,
                 color: Theme.of(context).colorScheme.primary)),
       );
+}
+
+/// Compact up/down trend chip used by Chart cards (§42/§45).
+class TrendIndicator extends StatelessWidget {
+  const TrendIndicator({super.key, this.changeKg, this.changePct, this.label = '', this.goodWhenNegative = false});
+  final double? changeKg;
+  final double? changePct;
+  final String label;
+  final bool goodWhenNegative;
+  @override
+  Widget build(BuildContext context) {
+    final v = changeKg ?? changePct ?? 0.0;
+    final unit = changeKg != null ? ' kg' : '%';
+    final positive = v >= 0;
+    final good = goodWhenNegative ? v <= 0 : v >= 0;
+    final color = good ? PulseColors.success : PulseColors.warning;
+    return Semantics(
+      label: '${positive ? 'Up' : 'Down'} ${v.abs().toStringAsFixed(1)}$unit $label',
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 14, color: color),
+        const SizedBox(width: 2),
+        Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
+            style: PulseTypography.label.copyWith(color: color, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
 }

@@ -63,7 +63,7 @@ class Goals {
   double fatGoal;
   double waterGoalLiters;
   int stepGoal;
-  double targetWeight;
+  double targetWeightKg;
   int workoutsPerWeek;
   Goals({
     required this.calorieGoal,
@@ -72,13 +72,20 @@ class Goals {
     required this.fatGoal,
     required this.waterGoalLiters,
     required this.stepGoal,
-    required this.targetWeight,
+    required this.targetWeightKg,
     required this.workoutsPerWeek,
   });
   Goals clone() => Goals(
       calorieGoal: calorieGoal, proteinGoal: proteinGoal, carbGoal: carbGoal,
       fatGoal: fatGoal, waterGoalLiters: waterGoalLiters, stepGoal: stepGoal,
-      targetWeight: targetWeight, workoutsPerWeek: workoutsPerWeek);
+      targetWeightKg: targetWeightKg, workoutsPerWeek: workoutsPerWeek);
+}
+
+/// A single weigh-in record (local-first persistence model).
+class WeightRecord {
+  final DateTime date;
+  final double kg;
+  const WeightRecord(this.date, this.kg);
 }
 
 /// App-wide change store.
@@ -97,7 +104,7 @@ class PulseStore extends ChangeNotifier {
 
   final Goals goals = Goals(
     calorieGoal: 2050, proteinGoal: 135, carbGoal: 220, fatGoal: 70,
-    waterGoalLiters: 2.6, stepGoal: 8000, targetWeight: 75, workoutsPerWeek: 4,
+    waterGoalLiters: 2.6, stepGoal: 8000, targetWeightKg: 75, workoutsPerWeek: 4,
   );
 
   // ── Today's logged state (matches brief numbers) ─────────────────
@@ -111,6 +118,14 @@ class PulseStore extends ChangeNotifier {
   double activityCaloriesBurned = 310; // from exercise today
   double stepsToday = 6842;
   double waterLogged = 1.7; // liters
+  int workoutsCompletedToday = 1;
+
+  /// Weigh-in history (local-first). Seeded with the sample trend so
+  /// charts have data on first launch; new entries are appended live.
+  final List<WeightRecord> weights = [
+    for (final p in PulseData.weightHistorySeed)
+      WeightRecord(p.$1, p.$2),
+  ];
   bool premium = false;
   bool offlineMode = false;
   String unitsMass = 'kg'; // kg | lb
@@ -119,6 +134,11 @@ class PulseStore extends ChangeNotifier {
   String unitsDistance = 'km'; // km | mi
 
   // Weight history for Chart/WeightTrend (trendline over daily noise)
+  static final weightHistorySeed = <(DateTime, double)>[
+    (DateTime(2026, 6, 1), 84.5), (DateTime(2026, 6, 15), 83.6), (DateTime(2026, 7, 1), 83.1),
+    (DateTime(2026, 7, 15), 82.4), (DateTime(2026, 8, 1), 81.9), (DateTime(2026, 8, 15), 81.0),
+    (DateTime(2026, 9, 1), 80.6), (DateTime(2026, 9, 15), 80.1), (DateTime(2026, 9, 29), 79.8),
+  ];
   static const weightHistory = <(String, double)>[
     ('Jun 1', 84.5), ('Jun 15', 83.6), ('Jul 1', 83.1), ('Jul 15', 82.4),
     ('Aug 1', 81.9), ('Aug 15', 81.0), ('Sep 1', 80.6), ('Sep 15', 80.1),
@@ -165,12 +185,66 @@ class PulseStore extends ChangeNotifier {
   }
 
   void logWeight(double kg) {
+    final now = DateTime.now();
+    weights.removeWhere((w) =>
+        w.date.year == now.year && w.date.month == now.month && w.date.day == now.day);
+    weights.add(WeightRecord(now, kg));
+    weights.sort((a, b) => a.date.compareTo(b.date));
     currentWeightLive = kg;
     track('weight_logged');
     notifyListeners();
   }
+
+  void deleteWeight(DateTime date) {
+    weights.removeWhere((w) =>
+        w.date.year == date.year && w.date.month == date.month && w.date.day == date.day);
+    if (weights.isNotEmpty) currentWeightLive = weights.last.kg;
+    track('weight_deleted');
+    notifyListeners();
+  }
+
   double? currentWeightLive;
   double get displayWeight => currentWeightLive ?? currentWeight;
+
+  /// Live current weight — latest weigh-in or the seeded sample value.
+  double get currentWeightKg => weights.isEmpty ? currentWeight : weights.last.kg;
+
+  /// Normalized (date-ordered) weight series for Chart/WeightTrend.
+  List<double> get weightSeries => weights.map((w) => w.kg).toList(growable: false);
+
+  bool get hasAnyData =>
+      diary.isNotEmpty || weights.isNotEmpty || waterLogged > 0 || workoutsCompletedToday > 0;
+
+  // ── Accessibility + appearance settings (§70) ────────────────────
+  bool highContrast = false;
+  bool largeText = false;
+  bool reduceMotion = false;
+  ThemeMode themeMode = ThemeMode.system;
+  bool analyticsEnabled = true;
+
+  void setHighContrast(bool v) { highContrast = v; track('accessibility_changed'); notifyListeners(); }
+  void setLargeText(bool v) { largeText = v; notifyListeners(); }
+  void setReduceMotion(bool v) { reduceMotion = v; notifyListeners(); }
+  void setThemeMode(ThemeMode m) { themeMode = m; notifyListeners(); }
+  void setAnalytics(bool v) { analyticsEnabled = v; notifyListeners(); }
+
+  // ── Units (§59) ──────────────────────────────────────────────────
+  void setUnitsWeight(String u) { unitsMass = u; notifyListeners(); }
+  void setUnitsHeight(String u) { unitsLength = u; notifyListeners(); }
+  void setUnitsVolume(String u) { unitsVolume = u; notifyListeners(); }
+  void setUnitsDistance(String u) { unitsDistance = u; notifyListeners(); }
+  String get unitsWeight => unitsMass;
+  String get unitsHeight => unitsLength;
+
+  /// Smart goal review seam (§51): updates multiple targets atomically and
+  /// never silently alters calorie targets without an explicit call here.
+  void setTargets({double? targetWeightKg, double? calorieGoal, double? proteinGoal}) {
+    if (targetWeightKg != null) goals.targetWeightKg = targetWeightKg;
+    if (calorieGoal != null) goals.calorieGoal = calorieGoal;
+    if (proteinGoal != null) goals.proteinGoal = proteinGoal;
+    track('goal_updated');
+    notifyListeners();
+  }
 
   void updateGoals(void Function(Goals g) edit) {
     edit(goals);

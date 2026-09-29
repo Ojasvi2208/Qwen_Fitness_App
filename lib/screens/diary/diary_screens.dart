@@ -390,7 +390,7 @@ class RecipeDetailScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: PulseSpacing.sm),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              CircleAvatar(radius: 13, backgroundColor: store.premium ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
+              CircleAvatar(radius: 13, backgroundColor: store.premium ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
                   foregroundColor: Colors.white, child: Text('${i + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
               const SizedBox(width: PulseSpacing.sm),
               Expanded(child: Text(step, style: Theme.of(context).textTheme.bodyMedium)),

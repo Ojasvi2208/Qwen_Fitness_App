@@ -750,7 +750,7 @@ class StreaksScreen extends StatelessWidget {
               decoration: BoxDecoration(
                   color: a.$3 ? PulseColors.secondary.withOpacity(0.12) : scheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(PulseRadius.full),
-                  border: Border.all(color: a.$3 ? PulseColors.secondary.withOpacity(0.5) : scheme.dividerColor)),
+                  border: Border.all(color: a.$3 ? PulseColors.secondary.withOpacity(0.5) : scheme.onSurface.withOpacity(0.12))),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(a.$2, size: 17, color: a.$3 ? PulseColors.secondary : scheme.onSurface.withOpacity(0.4)),
                 const SizedBox(width: 6),

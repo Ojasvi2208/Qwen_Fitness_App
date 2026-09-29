@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -457,7 +458,7 @@ class WaterScreen extends StatelessWidget {
                 Container(
                   decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
-                      border: Border.all(color: Theme.of(context).dividerColor, width: 2)),
+                      border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12), width: 2)),
                 ),
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
