@@ -279,7 +279,7 @@ class WorkoutSessionManager {
 
   void _mutated() {
     if (_seeding) return; // seeds must not mark the store dirty
-    _mutated();
+    onChanged();
   }
 
   WorkoutSession? get activeSession => _active;
