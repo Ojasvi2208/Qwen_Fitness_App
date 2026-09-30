@@ -76,10 +76,10 @@ class _CoachScreenState extends State<CoachScreen> {
       ], note: 'Rest 60–90 s between sets · estimated 190 kcal');
     }
     if (q.contains('week')) {
-      return _Msg(false, 'Your week in brief: average 2,075 kcal against a 2,050 goal, protein hit on 5 of 7 days, 58,420 steps and four workouts completed — your best week this month. Biggest win: consistency on evenings, where three of four misses used to happen.');
+      return _Msg(false, 'I can summarise your week once there are a few days of logs to read. Keep logging and ask me again — I will compare calories, protein and workouts against your goals.');
     }
     if (q.contains('higher yesterday')) {
-      return _Msg(false, 'Yesterday totalled 2,340 kcal — about 290 above goal. The difference sits almost entirely in the evening: a 500 kcal snack after dinner, logged at 9:40 PM. Late-evening snacking is worth watching, but one day doesn\'t change your trend — you averaged 2,084 across the week.');
+      return _Msg(false, 'Day-to-day comparisons need yesterday on record too. Once two days are logged I can show you where the difference sits — usually it is one meal rather than the whole day.');
     }
     return _Msg(false, 'Happy to help with that. Using what you\'ve logged so far, the most useful next step is usually a small one — want me to suggest options?');
   }

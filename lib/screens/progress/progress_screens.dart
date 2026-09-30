@@ -84,11 +84,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
         const SizedBox(height: PulseSpacing.m),
         Row(children: [
           Expanded(
-            child: _tile(context, 'Nutrition', '2,084 kcal avg\n7-day', Icons.restaurant_rounded, PulseColors.accent, () => Navigator.of(context).pushNamed('/nutrition-progress')),
+            child: _tile(context, 'Nutrition', 'Calories & macros\n7-day', Icons.restaurant_rounded, PulseColors.accent, () => Navigator.of(context).pushNamed('/nutrition-progress')),
           ),
           const SizedBox(width: PulseSpacing.s),
           Expanded(
-            child: _tile(context, 'Activity', '6,932 steps avg\n7-day', Icons.directions_walk_rounded, PulseColors.steps, () => Navigator.of(context).pushNamed('/activity-progress')),
+            child: _tile(context, 'Activity', 'Steps & workouts\n7-day', Icons.directions_walk_rounded, PulseColors.steps, () => Navigator.of(context).pushNamed('/activity-progress')),
           ),
         ]),
         const SizedBox(height: PulseSpacing.m),
@@ -281,6 +281,21 @@ class NutritionProgressScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = PulseStore.of(context);
+    // Weekly averages need per-day history, which only starts accumulating
+    // once the user logs. Until then say so rather than show sample figures.
+    if (!store.hasAnyData) {
+      return PulseScaffold(
+        title: 'Nutrition Progress',
+        subtitle: 'Last 7 days',
+        body: EmptyState(
+            icon: Icons.restaurant_rounded,
+            title: 'No nutrition history yet',
+            body: 'Log a few days of meals and your calorie and macro trends will appear here.',
+            actionLabel: 'Log Food',
+            onAction: () => openQuickLog(context)),
+      );
+    }
     return PulseScaffold(
       title: 'Nutrition Progress',
       subtitle: 'Last 7 days',
@@ -363,6 +378,17 @@ class ActivityProgressScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = PulseStore.of(context);
+    if (!store.hasAnyData) {
+      return const PulseScaffold(
+        title: 'Activity Progress',
+        subtitle: 'Steps · burn · workouts — last 7 days',
+        body: EmptyState(
+            icon: Icons.directions_walk_rounded,
+            title: 'No activity history yet',
+            body: 'Once steps and workouts are recorded for a few days, your weekly pattern shows up here.'),
+      );
+    }
     return PulseScaffold(
       title: 'Activity Progress',
       subtitle: 'Steps · burn · workouts — last 7 days',

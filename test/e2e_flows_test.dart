@@ -83,6 +83,16 @@ void main() {
           reason: 'the site catalog is app data, not user data');
     });
 
+    test('A1c: a store with no data reports so, gating the trend screens',
+        () async {
+      final repo = _MemRepo();
+      final store = await bootFresh(repo);
+      expect(store.hasAnyData, isFalse,
+          reason: 'the 7-day trend screens show their empty state on this');
+      store.addWater(0.25);
+      expect(store.hasAnyData, isTrue);
+    });
+
     test('A1b: onboarding captures the profile and the first weigh-in',
         () async {
       final repo = _MemRepo();

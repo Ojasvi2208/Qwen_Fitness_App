@@ -869,7 +869,7 @@ class StepsScreen extends StatelessWidget {
                 Text('${s.stepsToday.toStringAsFixed(0)} / ${s.goals.stepGoal}', style: PulseTypography.metricMedium.copyWith(color: scheme.onSurface)),
                 const SizedBox(height: 4),
                 Text('Distance ${(s.stepsToday * 0.000715).toStringAsFixed(1)} km', style: Theme.of(context).textTheme.bodyMedium),
-                Text('Estimated activity calories 246', style: Theme.of(context).textTheme.bodySmall),
+                Text('Estimated activity calories ${(s.stepsToday * 0.04).round()}', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: PulseSpacing.s),
                 Text('A 10-minute walk would put you close to today\'s step target.',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary)),
@@ -879,15 +879,11 @@ class StepsScreen extends StatelessWidget {
         ),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Last 7 days'),
-        PulseCard(
-          child: Column(children: [
-            PulseBarChart(values: const [5760, 7600, 4880, 8000, 7040, 3600, 6842], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 8000, highlightIndex: 6),
-            const SizedBox(height: PulseSpacing.s),
-            Row(children: [for (final d in const ['M', 'T', 'W', 'T', 'F', 'S', 'S']) Expanded(child: Center(child: Text(d, style: Theme.of(context).textTheme.labelSmall))) ]),
-            const SizedBox(height: PulseSpacing.xs),
-            Text('Red line marks your 8,000-step daily goal. Bars show each day against it.',
-                style: Theme.of(context).textTheme.labelSmall),
-          ]),
+        const PulseCard(
+          child: EmptyState(
+              icon: Icons.bar_chart_rounded,
+              title: 'Your weekly pattern is building',
+              body: 'Each day of recorded steps adds a bar here, measured against your daily goal.'),
         ),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Source'),
