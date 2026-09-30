@@ -25,7 +25,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // v2: additive `workouts` block (WP3.1 session engine). v1 snapshots
 // still load — the block is optional and defaults to empty history.
-const int kPulseSchemaVersion = 2;
+const int kPulseSchemaVersion = 4;
 const String kSnapshotKey = 'pulse.snapshot.v1';
 const String kMetaKey = 'pulse.meta.v1';
 

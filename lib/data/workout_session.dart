@@ -154,6 +154,12 @@ class WorkoutSession {
   DateTime? finishedAt;
   int? rating; // 0 too easy · 1 just right · 2 too hard (§37)
 
+  /// WP3.4 — true only for sample-history rows seeded on first launch.
+  /// Seeded rows carry fixed wall-clock dates so charts stay populated,
+  /// but they must never leak into *today's* derived counters (workouts
+  /// completed today, streaks). User-completed sessions are always false.
+  final bool seeded;
+
   WorkoutSession({
     required this.id,
     required this.templateName,
@@ -161,6 +167,7 @@ class WorkoutSession {
     List<SetRecord>? sets,
     this.finishedAt,
     this.rating,
+    this.seeded = false,
   }) : sets = sets ?? [];
 
   SessionStatus get status => finishedAt == null ? SessionStatus.active : SessionStatus.finished;
@@ -226,6 +233,7 @@ class WorkoutSession {
         'startedAt': startedAt.toIso8601String(),
         'finishedAt': finishedAt?.toIso8601String(),
         'rating': rating,
+        if (seeded) 'seeded': true,
         'sets': [for (final s in sets) s.toJson()],
       };
 
@@ -241,6 +249,7 @@ class WorkoutSession {
       startedAt: start,
       finishedAt: DateTime.tryParse('${m['finishedAt']}'),
       rating: (m['rating'] as num?)?.toInt(),
+      seeded: m['seeded'] == true,
       sets: [
         for (final raw in (m['sets'] is List ? m['sets'] as List : const []))
           if (raw is Map) SetRecord.fromJson(raw.cast<String, dynamic>()),
@@ -258,8 +267,20 @@ class WorkoutSessionManager {
   /// Invoked after every mutation (persist + notifyListeners upstream).
   final void Function() onChanged;
 
+  /// WP3.4 — when true, the next [onChanged] fires through [_dirtyGuard]
+  /// so seed data never triggers an autosave write (keeps first launch
+  /// byte-identical to "no user data yet"). Set by PulseStore around
+  /// [seedHistory].
+  bool _seeding = false;
+  bool Function()? dirtyGuard;
+
   WorkoutSession? _active;
   final List<WorkoutSession> _history = [];
+
+  void _mutated() {
+    if (_seeding) return; // seeds must not mark the store dirty
+    _mutated();
+  }
 
   WorkoutSession? get activeSession => _active;
   bool get hasActive => _active != null;
@@ -277,7 +298,7 @@ class WorkoutSessionManager {
       templateName: templateName,
       startedAt: now ?? DateTime.now(),
     );
-    onChanged();
+    _mutated();
     return _active!;
   }
 
@@ -302,7 +323,7 @@ class WorkoutSessionManager {
       completedAt: now ?? DateTime.now(),
     );
     s.sets.add(rec);
-    onChanged();
+    _mutated();
     return rec;
   }
 
@@ -311,7 +332,7 @@ class WorkoutSessionManager {
     final s = _active;
     if (s == null || s.sets.isEmpty) return null;
     final removed = s.sets.removeLast();
-    onChanged();
+    _mutated();
     return removed;
   }
 
@@ -325,7 +346,7 @@ class WorkoutSessionManager {
     if (rating != null) s.rating = rating.clamp(0, 2);
     _history.add(s);
     _active = null;
-    onChanged();
+    _mutated();
     return s;
   }
 
@@ -334,7 +355,7 @@ class WorkoutSessionManager {
   void discardActive() {
     if (_active == null) return;
     _active = null;
-    onChanged();
+    _mutated();
   }
 
   /// Attach/update a difficulty rating on a saved session by id.
@@ -342,15 +363,57 @@ class WorkoutSessionManager {
     for (final s in _history) {
       if (s.id == sessionId) {
         s.rating = rating.clamp(0, 2);
-        onChanged();
+        _mutated();
         return;
       }
     }
     if (_active?.id == sessionId) {
       _active!.rating = rating.clamp(0, 2);
-      onChanged();
+      _mutated();
     }
   }
+
+  /// WP3.4 — seed the sample workout history (§84 Alex Morgan: "You've
+  /// completed 20 workouts", weekly report "Workouts: 4"). Seeded rows
+  /// carry fixed wall-clock dates so charts look realistic on first
+  /// launch, but are flagged [seeded] so they never inflate *today's*
+  /// counters or streaks. Only applied when the user has no real data.
+  void seedHistory(List<WorkoutSession> sessions) {
+    if (_history.isNotEmpty || _active != null) return; // never clobber real data
+    _history.addAll(sessions);
+    _mutated();
+  }
+
+  /// Completed (non-seeded) sessions on the given calendar day.
+  List<WorkoutSession> completedOn(DateTime day) => _history
+      .where((s) =>
+          !s.seeded &&
+          s.finishedAt != null &&
+          s.finishedAt!.year == day.year &&
+          s.finishedAt!.month == day.month &&
+          s.finishedAt!.day == day.day)
+      .toList(growable: false);
+
+  /// All finished sessions whose finish date falls inside
+  /// `[end.subtract(Duration(days: days - 1)), end]` inclusive — used by
+  /// the weekly report and consistency insights.
+  List<WorkoutSession> finishedWithinDays(int days, {DateTime? end}) {
+    final e = end ?? DateTime.now();
+    final endDay = DateTime(e.year, e.month, e.day);
+    final startDay = endDay.subtract(Duration(days: days - 1));
+    return _history.where((s) {
+      if (s.finishedAt == null) return false;
+      final d = DateTime(s.finishedAt!.year, s.finishedAt!.month, s.finishedAt!.day);
+      return !d.isBefore(startDay) && !d.isAfter(endDay);
+    }).toList(growable: false);
+  }
+
+  /// Count of non-seeded completed sessions (the honest number behind
+  /// "You've completed N workouts" milestones).
+  int get realCompletedCount => _history.where((s) => !s.seeded && s.finishedAt != null).length;
+
+  /// Count including seeded samples (achievement display only).
+  int get totalCompletedCount => _history.where((s) => s.finishedAt != null).length;
 
   // ── Snapshot (de)serialization for PulseStore persistence ────────
 

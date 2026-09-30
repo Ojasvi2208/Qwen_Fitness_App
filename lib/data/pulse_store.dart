@@ -2,7 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
+import 'consistency_service.dart';
+import 'measurements.dart';
+import 'nutrition_service.dart';
 import 'persistence/local_backend.dart';
+import 'progress_photos.dart';
+import 'reminders.dart';
 import 'workout_session.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
@@ -136,6 +141,40 @@ class PulseStore extends ChangeNotifier {
   double waterLogged = 1.7; // liters
   int workoutsCompletedToday = 1;
 
+  /// ── WP3.5 Reminders (§58/§64) ───────────────────────────────────
+  /// Models persist in the snapshot; OS scheduling lives behind the
+  /// injectable [ReminderScheduler] seam (production wires the plugin).
+  late final ReminderManager reminders = ReminderManager(
+    onChanged: () {
+      _markDirty();
+      notifyListeners();
+    },
+  );
+
+  /// ── WP3.4 Habit toggles (§40 "customize which habits are tracked") ─
+  /// Starts from the catalog defaults; persisted so a user's choices
+  /// survive restarts. Keyed by habit name.
+  final Map<String, bool> habitEnabled = {for (final h in PulseData.habits) h.name: h.on};
+
+  bool toggleHabit(String name) {
+    final v = !(habitEnabled[name] ?? true);
+    habitEnabled[name] = v;
+    _markDirty();
+    notifyListeners();
+    return v;
+  }
+
+  List<({String name, IconData icon, Color color, String progress, bool on})> get activeHabits =>
+      PulseData.habits.where((h) => habitEnabled[h.name] ?? h.on).toList(growable: false);
+
+  /// ── WP3.2 Nutrition service accessor ────────────────────────────
+  /// The single source of truth for calorie/macro figures. Screens that
+  /// need fiber or per-meal totals read this instead of recomputing.
+  DayNutrition get nutrition => NutritionService.forToday(this);
+
+  /// ── WP3.4 Consistency engine accessor ───────────────────────────
+  ConsistencyStore get consistency => ConsistencyStore(this);
+
   /// ── WP3.1 Workout Session Engine ────────────────────────────────
   /// Single source of truth for active + completed sessions. Every
   /// mutation persists via autosave and notifies listeners.
@@ -188,6 +227,80 @@ class PulseStore extends ChangeNotifier {
     return s;
   }
 
+  /// ── WP3.3 Body Measurements + Progress Photos (§45/§46) ─────────
+  /// Metadata-only photo book — image bytes never enter the snapshot.
+  /// Seeded with Alex Morgan's sample history (§84) so the screen shows
+  /// realistic trend data on first launch; logging a value for today
+  /// upserts rather than duplicates (same semantics as the weight log).
+  MeasurementBook measurements = _seedMeasurements(MeasurementBook());
+  final ProgressPhotoBook progressPhotos = ProgressPhotoBook();
+
+  static MeasurementBook _seedMeasurements(MeasurementBook b) {
+    const seed = <(String, int, int, double)>[
+      ('body_fat', 6, 23.5), ('body_fat', 9, 21.4),
+      ('waist', 6, 94), ('waist', 9, 88),
+      ('chest', 6, 102), ('chest', 9, 101),
+      ('hips', 6, 103), ('hips', 9, 99),
+      ('arms', 6, 32.5), ('arms', 9, 33),
+      ('thighs', 6, 57), ('thighs', 9, 56),
+      ('neck', 6, 38), ('neck', 9, 38),
+    ];
+    for (final (id, mo, v) in seed) {
+      b.log(id, DateTime(2026, mo, 15), v);
+    }
+    return b;
+  }
+
+  /// Log (or same-day replace) a measurement. Returns false for unknown
+  /// sites or invalid values so the UI can show inline errors (§75).
+  bool logMeasurement(String siteId, double value, {DateTime? onDate}) {
+    final ok = measurements.log(siteId, onDate ?? DateTime.now(), value);
+    if (ok) {
+      track('measurement_logged');
+      _markDirty();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  /// Add a custom measurement site (§45 "Allow custom measurement").
+  /// Returns false when the label collides with an existing site.
+  bool addMeasurementSite(String label, {String unit = 'cm', bool lowerIsBetter = true}) {
+    final id = 'custom_${label.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '_')}';
+    final ok = measurements.addSite(MeasurementSite(id: id, label: label, unit: unit, lowerIsBetter: lowerIsBetter));
+    if (ok) {
+      _markDirty();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  /// Register a captured progress photo. [fileName] points into the app's
+  /// private documents directory; nothing is uploaded (§46 privacy).
+  void addProgressPhoto(PhotoPose pose, String fileName, {DateTime? onDate}) {
+    progressPhotos.add(ProgressPhoto(
+      id: 'ph_${DateTime.now().microsecondsSinceEpoch}',
+      date: onDate ?? DateTime.now(),
+      pose: pose,
+      fileName: fileName,
+      weightKgAtCapture: currentWeightLive ?? currentWeight,
+    ));
+    track('progress_photo_added');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Remove a photo record; returns the file name so the caller can
+  /// delete the image from disk atomically (§60 erasure).
+  String? removeProgressPhoto(String id) {
+    final f = progressPhotos.remove(id);
+    if (f != null) {
+      _markDirty();
+      notifyListeners();
+    }
+    return f;
+  }
+
   /// Weigh-in history (local-first). Seeded with the sample trend so
   /// charts have data on first launch; new entries are appended live.
   final List<WeightRecord> weights = [
@@ -214,6 +327,10 @@ class PulseStore extends ChangeNotifier {
     ('Sep 29', 79.8),
   ];
   static const weeklyCalories = <int>[2120, 1980, 2065, 2210, 2040, 1995, 2145];
+
+  /// Fiber goal in grams — general adult guidance (displayed as an
+  /// informational target; PULSE does not provide medical advice).
+  static const double fiberGoal = 28;
 
   // ── Derived totals ────────────────────────────────────────────────
   double get foodKcal => diary.fold(0.0, (s, e) => s + e.kcal);
@@ -385,8 +502,10 @@ class PulseStore extends ChangeNotifier {
 
   /// Wire the local repository and restore any previously saved state.
   /// Safe to call more than once; awaits all pending writes first.
-  Future<void> attachPersistence(LocalRepository repository) async {
+  Future<void> attachPersistence(LocalRepository repository,
+      {ReminderScheduler? reminderScheduler}) async {
     await flushPendingSave();
+    if (reminderScheduler != null) reminders.attachScheduler(reminderScheduler);
     _repository = repository;
     await repository.init();
     final snapshot = repository.readSnapshot();
@@ -483,6 +602,26 @@ class PulseStore extends ChangeNotifier {
     sessions.hydrate(s['workouts'] is Map
         ? (s['workouts'] as Map).cast<String, dynamic>()
         : null);
+    // schema v3 block. Absent in v1/v2 snapshots → keep seeded sample
+    // history (§84). Present but empty (post-"Delete My Data") → start
+    // from a clean book so erased data never resurrects on restart.
+    if (s['measurements'] is Map) {
+      measurements = MeasurementBook();
+      measurements.hydrate((s['measurements'] as Map).cast<String, dynamic>());
+    }
+    if (s['photos'] is Map) {
+      progressPhotos.hydrate((s['photos'] as Map).cast<String, dynamic>());
+    }
+    // schema v4 block — reminders + habit toggles. Absent in older
+    // snapshots → keep defaults (safe additive migration).
+    if (s['reminders'] is Map) {
+      reminders.hydrate((s['reminders'] as Map).cast<String, dynamic>());
+    }
+    if (s['habits'] is Map) {
+      for (final e in (s['habits'] as Map).entries) {
+        if (e.key is String && e.value is bool) habitEnabled[e.key as String] = e.value as bool;
+      }
+    }
     notifyListeners();
   }
 
@@ -508,6 +647,10 @@ class PulseStore extends ChangeNotifier {
         'activityKcal': activityCaloriesBurned,
         'workoutsToday': workoutsCompletedToday,
         'workouts': sessions.toJson(),
+        'measurements': measurements.toJson(),
+        'photos': progressPhotos.toJson(),
+        'reminders': reminders.toJson(),
+        'habits': {...habitEnabled},
         'premium': premium,
         'offline': offlineMode,
         'units': {
@@ -538,6 +681,10 @@ class PulseStore extends ChangeNotifier {
     workoutsCompletedToday = 0;
     currentWeightLive = null;
     sessions.discardActive(); // active session lives in memory + disk — wipe both
+    measurements = MeasurementBook(); // §60: seeded sample history erased too
+    progressPhotos.eraseAll();
+    reminders.eraseAll();
+    habitEnabled.updateAll((k, v) => PulseData.habits.firstWhere((h) => h.name == k).on);
     _hydratedFromDisk = false;
     final repo = _repository;
     if (repo != null) {
