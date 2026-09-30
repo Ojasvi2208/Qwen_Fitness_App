@@ -1,3 +1,4 @@
+import 'dart:convert';
 // ══════════════════════════════════════════════════════════════════
 // Phase 3 — WP3.3 data-consistency tests
 // Body Measurements (§45) + Progress Photo metadata (§46)
@@ -81,7 +82,7 @@ void main() {
 
   group('ProgressPhotoBook (pure domain)', () {
     ProgressPhoto p(String id, int m, PhotoPose pose) => ProgressPhoto(
-        id: id, date: DateTime(2026, m, 1), pose: pose, fileName: '$id.jpg', weightKgAtCapture: 80 + m);
+        id: id, date: DateTime(2026, m, 1), pose: pose, fileName: '$id.jpg', weightKgAtCapture: 80.0 + m);
 
     test('photos sort oldest→newest; comparisonPair gives first/last', () {
       final b = ProgressPhotoBook();
@@ -138,8 +139,8 @@ void main() {
     test('invalid measurement returns false and does not dirty state', () async {
       final s = await freshStore();
       final before = jsonEncode(s.toSnapshot()['measurements']);
-      expect(s.logMeasurement('waist', -1), isFalse);
-      expect(s.logMeasurement('ghost', 50), isFalse);
+      expect(s.logMeasurement('waist', -1.0), isFalse);
+      expect(s.logMeasurement('ghost', 50.0), isFalse);
       expect(jsonEncode(s.toSnapshot()['measurements']), before); // byte-identical
     });
 
@@ -195,7 +196,7 @@ void main() {
 
     test('export bundle includes new sections for Download My Data', () async {
       final s = await freshStore();
-      s.logMeasurement('hips', 99);
+      s.logMeasurement('hips', 99.0);
       final exported = jsonDecode(s.exportUserDataJson()) as Map<String, dynamic>;
       expect(exported['schemaVersion'], 3);
       // seed dates land on the 15th, so a fresh log creates a new day entry

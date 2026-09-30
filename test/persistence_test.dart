@@ -264,7 +264,7 @@ void main() {
       final slow = _SlowRepo(repo, extraDelayMs: 5, onFirstWrite: () => auto.request());
       auto = AutosaveCoordinator(
         repository: slow,
-        buildSnapshot: () {'n': writes},
+        buildSnapshot: () => {'n': writes},
       );
       auto.request();
       await auto.flush().timeout(const Duration(seconds: 5));

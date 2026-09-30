@@ -10,7 +10,6 @@
 /// ══════════════════════════════════════════════════════════════════
 
 import 'pulse_store.dart';
-import 'workout_session.dart';
 
 DateTime dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
 

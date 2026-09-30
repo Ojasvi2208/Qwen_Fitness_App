@@ -50,7 +50,7 @@ class WorkoutTemplate {
 class ExercisePlan {
   final String name;
   final int targetSets;
-  final int targetReps; // null = AMRAP
+  final int? targetReps; // null = AMRAP (as-many-reps-as-possible)
   final String muscle;
   const ExercisePlan(this.name, this.targetSets, this.targetReps, this.muscle);
 
