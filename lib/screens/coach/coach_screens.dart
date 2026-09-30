@@ -20,7 +20,7 @@ class CoachScreen extends StatefulWidget {
 
 class _CoachScreenState extends State<CoachScreen> {
   late final List<_Msg> _thread = [
-    _Msg(false, 'Hi Alex. What can I help you with today?'),
+    _Msg(false, 'Hi. What can I help you with today?'),
   ];
   final _input = TextEditingController();
   bool _typing = false;

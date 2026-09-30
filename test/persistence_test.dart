@@ -101,6 +101,7 @@ void main() {
     test('removeEntry (undo swipe) persists', () async {
       final store = PulseStore();
       await store.attachPersistence(await newRepo());
+      store.addFood(PulseData.foodById('f1'), 1, MealType.breakfast);
       final id = store.diary.first.id;
       store.removeEntry(id);
       await store.flushPendingSave();
@@ -157,7 +158,7 @@ void main() {
       expect(revived.goals.calorieGoal, 2100);
       expect(revived.goals.proteinGoal, 140);
       // Untouched goals keep defaults.
-      expect(revived.goals.carbGoal, 220);
+      expect(revived.goals.carbGoal, 200);
     });
 
     test('units + accessibility + theme settings persist', () async {

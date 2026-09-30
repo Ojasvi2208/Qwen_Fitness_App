@@ -23,6 +23,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
   int _range = 1; // 30 days default
   static const _ranges = ['7 Days', '30 Days', '3 Months', '6 Months', '1 Year', 'All'];
 
+  /// Fraction of the journey from the starting weight to the target that has
+  /// been covered. Returns 0 while either end is still unset, so the bar
+  /// reads empty rather than dividing by a zero span.
+  double _goalProgress(PulseStore store) {
+    final span = store.startWeight - store.goals.targetWeightKg;
+    if (span <= 0) return 0;
+    return ((store.startWeight - store.currentWeightKg) / span).clamp(0, 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = PulseStore.of(context);
@@ -69,7 +78,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             Text('Goal ${store.goals.targetWeightKg.toStringAsFixed(0)} kg · ${(store.currentWeightKg - store.goals.targetWeightKg).toStringAsFixed(1)} kg remaining',
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: PulseSpacing.s),
-            PulseBar(value: ((84.5 - store.currentWeightKg) / (84.5 - store.goals.targetWeightKg)).clamp(0, 1), color: PulseColors.success, height: 8),
+            PulseBar(value: _goalProgress(store), color: PulseColors.success, height: 8),
           ]),
         ),
         const SizedBox(height: PulseSpacing.m),
@@ -133,7 +142,7 @@ class WeightProgressScreen extends StatelessWidget {
         PulseCard(
           padding: const EdgeInsets.all(PulseSpacing.l),
           child: Row(children: [
-            _stat(context, 'Starting', '84.5 kg'),
+            _stat(context, 'Starting', '${store.startWeight.toStringAsFixed(1)} kg'),
             _stat(context, 'Current', '${store.currentWeightKg.toStringAsFixed(1)} kg'),
             _stat(context, 'Goal', '${store.goals.targetWeightKg.toStringAsFixed(0)} kg'),
           ]),
@@ -152,7 +161,9 @@ class WeightProgressScreen extends StatelessWidget {
         PulseCard(
           child: Column(children: [
             Semantics(
-              label: 'Weight trend line from 84.5 kilograms down to 79.8 kilograms over the last weeks, goal 75 kilograms.',
+              label: 'Weight trend line from ${store.startWeight.toStringAsFixed(1)} kilograms '
+                  'to ${store.currentWeightKg.toStringAsFixed(1)} kilograms over the last weeks, '
+                  'goal ${store.goals.targetWeightKg.toStringAsFixed(0)} kilograms.',
               child: PulseLineChart(points: store.weightSeries, height: 190, color: scheme.primary, goalY: store.goals.targetWeightKg),
             ),
             const SizedBox(height: PulseSpacing.s),
@@ -933,7 +944,9 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
   Widget build(BuildContext context) {
     final store = context.pulse;
     final scheme = Theme.of(context).colorScheme;
-    final newKcal = (2050 + (75 - _target) * 18).round();
+    final newKcal =
+        (store.goals.calorieGoal + (store.goals.targetWeightKg - _target) * 18)
+            .round();
     return PulseScaffold(
       title: widget.goalLabel ?? 'Edit Weight Goal',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -946,7 +959,7 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
                   onChanged: (v) => setState(() => _target = v)),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text('Current: ${store.currentWeightKg.toStringAsFixed(1)} kg', style: Theme.of(context).textTheme.bodySmall),
-                Text('From 84.5 kg you\'d lose ${(84.5 - _target).toStringAsFixed(1)} kg total', style: Theme.of(context).textTheme.bodySmall),
+                Text('From ${store.startWeight.toStringAsFixed(1)} kg you\'d lose ${(store.startWeight - _target).toStringAsFixed(1)} kg total', style: Theme.of(context).textTheme.bodySmall),
               ]),
             ]),
           ),

@@ -23,7 +23,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     Future.delayed(const Duration(milliseconds: 1600), () {
-      if (mounted) Navigator.of(context).pushReplacementNamed('/welcome');
+      if (!mounted) return;
+      // No captured profile yet → onboarding, never the sample dashboard.
+      final next = context.pulse.hasProfile ? '/home' : '/welcome';
+      Navigator.of(context).pushReplacementNamed(next);
     });
   }
 
@@ -219,7 +222,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _email = TextEditingController(text: 'alex.morgan@email.com');
+  final _email = TextEditingController();
   final _password = TextEditingController();
   bool _showPassword = false;
   bool _acceptedTerms = false;
@@ -358,7 +361,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'alex.morgan@email.com');
+  final _email = TextEditingController();
   final _password = TextEditingController(text: 'pulsepass1');
   bool _show = false;
 
@@ -451,7 +454,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           const EmptyState(
               icon: Icons.mark_email_read_rounded,
               title: 'Check your inbox',
-              body: 'If an account exists for alex.morgan@email.com, a reset link is on its way. It expires in 30 minutes.'),
+              body: 'If an account exists for that address, a reset link is on its way. It expires in 30 minutes.'),
         ],
       ]),
     );

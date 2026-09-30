@@ -49,7 +49,7 @@ void main() {
 
     store.addWater(0.25);
     await tester.pump();
-    expect(store.waterLogged, closeTo(1.95, 0.001)); // 1.7 seeded + 0.25
+    expect(store.waterLogged, closeTo(0.25, 0.001)); // nothing logged before
 
     await store.flushPendingSave();
     final revived = await hydratedStore();

@@ -200,8 +200,8 @@ void main() {
       s.logMeasurement('hips', 99.0);
       final exported = jsonDecode(s.exportUserDataJson()) as Map<String, dynamic>;
       expect(exported['schemaVersion'], kPulseSchemaVersion);
-      // seed dates land on the 15th, so a fresh log creates a new day entry
-      expect(((exported['measurements'] as Map)['history'] as Map)['hips'], hasLength(3));
+      // only the entry this test logged: a new install ships no history
+      expect(((exported['measurements'] as Map)['history'] as Map)['hips'], hasLength(1));
     });
   });
 }
