@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pulse_app/data/pulse_store.dart';
 import 'package:pulse_app/screens/auth/auth_screens.dart';
+import 'package:pulse_app/screens/auth/onboarding_screen.dart';
 import 'package:pulse_app/theme/pulse_theme.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
@@ -120,6 +121,91 @@ void main() {
         expect(t, isNot(contains('fail')));
         expect(t, isNot(contains('invalid input')));
         expect(t, isNot(contains('wrong')));
+      }
+    });
+  });
+
+  _onboardingTests();
+}
+
+/// ═══════════════════════════════════════════════════════════════════
+/// Onboarding details step (§14). Every step renders into the same slot,
+/// so the fields must survive a step change with working input.
+/// ═══════════════════════════════════════════════════════════════════
+Widget _onboardingHost(PulseStore store, {int step = 2}) => PulseScope(
+      store: store,
+      child: MaterialApp(
+        theme: PulseTheme.light(),
+        home: OnboardingScreen(step: step),
+      ),
+    );
+
+void _onboardingTests() {
+  group('onboarding details step', () {
+    testWidgets('the four detail fields are present and focusable',
+        (tester) async {
+      await tester.pumpWidget(_onboardingHost(PulseStore()));
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(4)); // name, age, height, weight
+
+      // Each field must take focus, which is what raises the keyboard.
+      // The weight field sits below the fold on an 800x600 test surface.
+      for (var i = 0; i < 4; i++) {
+        await tester.ensureVisible(fields.at(i));
+        await tester.pumpAndSettle();
+        await tester.tap(fields.at(i));
+        await tester.pumpAndSettle();
+        final node = tester.widget<TextField>(fields.at(i)).focusNode;
+        expect(node, isNotNull,
+            reason: 'field $i needs a FocusNode to hold the input connection');
+        expect(node!.hasFocus, isTrue, reason: 'field $i did not take focus');
+      }
+    });
+
+    testWidgets('typing reaches every field', (tester) async {
+      await tester.pumpWidget(_onboardingHost(PulseStore()));
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Priya');
+      await tester.enterText(fields.at(1), '29');
+      await tester.enterText(fields.at(2), '165');
+      await tester.enterText(fields.at(3), '68');
+      await tester.pumpAndSettle();
+      expect(find.text('Priya'), findsOneWidget);
+      expect(find.text('29'), findsOneWidget);
+      expect(find.text('165'), findsOneWidget);
+      expect(find.text('68'), findsOneWidget);
+    });
+
+    testWidgets('fields still accept focus after moving between steps',
+        (tester) async {
+      await tester.pumpWidget(_onboardingHost(PulseStore()));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'Priya');
+      await tester.pumpAndSettle();
+
+      // Forward then back: the step subtree is rebuilt in the same slot,
+      // which is where the input connection used to be lost.
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.close_rounded));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(4));
+      await tester.tap(fields.at(0));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(fields.at(0)).focusNode?.hasFocus, isTrue,
+          reason: 'a returning step must still raise the keyboard');
+    });
+
+    testWidgets('nothing is pre-filled with someone else\'s details',
+        (tester) async {
+      await tester.pumpWidget(_onboardingHost(PulseStore()));
+      await tester.pumpAndSettle();
+      for (final f in tester.widgetList<TextField>(find.byType(TextField))) {
+        expect(f.controller?.text ?? '', isEmpty);
       }
     });
   });
