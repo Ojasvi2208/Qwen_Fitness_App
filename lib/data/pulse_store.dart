@@ -135,6 +135,9 @@ class PulseStore extends ChangeNotifier {
     DiaryEntry(id: 'e2', food: PulseData.foods[2], servings: 1.2, meal: MealType.lunch),
     DiaryEntry(id: 'e3', food: PulseData.foods[3], servings: 1, meal: MealType.lunch),
     DiaryEntry(id: 'e4', food: PulseData.foods[5], servings: 1, meal: MealType.dinner),
+    // Chickpea-and-avocado salad: brings the sample day to the §17 total.
+    DiaryEntry(id: 'e5', food: PulseData.foods[17], servings: 2, meal: MealType.lunch),
+    DiaryEntry(id: 'e6', food: PulseData.foods[9], servings: 1, meal: MealType.lunch),
   ];
 
   double activityCaloriesBurned = 310; // from exercise today
@@ -313,8 +316,17 @@ class PulseStore extends ChangeNotifier {
     WeightRecord(DateTime(2026, 8, 15), 81.0),
     WeightRecord(DateTime(2026, 9, 1), 80.6),
     WeightRecord(DateTime(2026, 9, 15), 80.1),
-    WeightRecord(DateTime(2026, 9, 29), 79.8),
+    // Latest sample weigh-in is dated today, so the trend stays current
+    // however long after authoring the app is launched (§84).
+    WeightRecord(_seedToday(), 79.8),
   ];
+
+  /// Midnight today — keeps the seeded weigh-in day-granular so logging a
+  /// weight now upserts this row instead of appending beside it.
+  static DateTime _seedToday() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
   /// ── PHASE 4: subscription state (single source of truth) ──────
   /// Legacy `premium` reads now derive from the entitlement engine so
   /// trial expiry, paid plans and ad policy can never disagree with UI.
@@ -376,7 +388,6 @@ class PulseStore extends ChangeNotifier {
   static const weightHistory = <(String, double)>[
     ('Jun 1', 84.5), ('Jun 15', 83.6), ('Jul 1', 83.1), ('Jul 15', 82.4),
     ('Aug 1', 81.9), ('Aug 15', 81.0), ('Sep 1', 80.6), ('Sep 15', 80.1),
-    ('Sep 29', 79.8),
   ];
   static const weeklyCalories = <int>[2120, 1980, 2065, 2210, 2040, 1995, 2145];
 
@@ -454,7 +465,10 @@ class PulseStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  double? currentWeightLive;
+  /// Seeded from the last sample weigh-in (§84) so the trend endpoint and
+  /// the headline figure agree on first launch; null only once every record
+  /// has been deleted.
+  double? currentWeightLive = 79.8;
   double get displayWeight => currentWeightLive ?? currentWeight;
 
   /// Live current weight — latest weigh-in or the seeded sample value.

@@ -198,7 +198,10 @@ class WorkoutSession {
       Difficulty.intermediate => 6.2,
       Difficulty.advanced => 7.4,
     };
-    return (elapsed.inSeconds / 60 * perMin).round().clamp(0, 2000);
+    final est = (elapsed.inSeconds / 60 * perMin).round();
+    // Floor at 1 kcal once any set is logged: work was done even if the
+    // session was finished in the same tick it started.
+    return est.clamp(sets.isEmpty ? 0 : 1, 2000);
   }
 
   /// Volume formatted like §37: "8,640 kg".

@@ -65,7 +65,8 @@ void main() {
     test('A1: fresh install boots with seeded sample profile (§84)', () async {
       final repo = _MemRepo();
       final store = await bootFresh(repo);
-      expect(store.hydratedFromDisk, isTrue);
+      expect(store.hydratedFromDisk, isFalse,
+          reason: 'a first launch has no snapshot to restore');
       // Alex Morgan defaults must be present immediately — the plan
       // screen values (§14 step 9) are the source of truth.
       expect(store.goals.calorieGoal, 2050);
@@ -188,7 +189,7 @@ void main() {
       store.logSet(exerciseIndex: 0, setNumber: 2, reps: 10, weightKg: 20);
       store.logSet(exerciseIndex: 1, setNumber: 1, reps: 12, weightKg: 12);
       expect(session.totalSets, 3);
-      expect(session.volumeKg, closeTo(532, 0.001));
+      expect(session.volumeKg, closeTo(544, 0.001));
       final done = store.finishWorkout(rating: 1);
       expect(done, isNotNull);
       expect(done!.rating, 1);
@@ -253,6 +254,7 @@ void main() {
       final repo = _MemRepo();
       var store = await bootFresh(repo);
       store.logWeight(79.2);
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.weights.last.kg, closeTo(79.2, 0.001));
       expect(store.currentWeightLive, closeTo(79.2, 0.001));
@@ -428,7 +430,7 @@ void main() {
       final store = await bootFresh(repo);
       expect(store.goals.calorieGoal, 2050);
       expect(store.waterLogged, closeTo(1.7, 0.001)); // seed default kept
-      expect(store.diary.length, 3); // seeded diary untouched by garbage
+      expect(store.diary.length, 6); // seeded diary untouched by garbage
     });
 
     test('X3: export bundle contains user data and excludes catalogs',

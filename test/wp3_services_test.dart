@@ -58,8 +58,8 @@ void main() {
     test('fiber aggregates across diary entries', () {
       final s = PulseStore();
       final n = NutritionService.forToday(s);
-      // f1(0)+f3*1.2(0)+f4(3.5)+f6(0) from seed diary
-      expect(n.fiber, closeTo(3.5, 0.01));
+      // f1(0)+f3*1.2(0)+f4(3.5)+f6(0)+f18*2(12.6)+f10(6.4) from seed diary
+      expect(n.fiber, closeTo(22.5, 0.01));
     });
 
     test('meal subtotals sum to food total', () {
