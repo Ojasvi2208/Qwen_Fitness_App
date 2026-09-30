@@ -205,11 +205,14 @@ class PulseStore extends ChangeNotifier {
 
   void logWeight(double kg, {DateTime? date}) {
     final now = date ?? DateTime.now();
+    // Day-granular upsert: re-logging a day replaces that day's record
+    // (seed rows included) instead of duplicating it.
     weights.removeWhere((w) =>
         w.date.year == now.year && w.date.month == now.month && w.date.day == now.day);
     weights.add(WeightRecord(now, kg));
     weights.sort((a, b) => a.date.compareTo(b.date));
     currentWeightLive = kg;
+    currentWeight = kg; // headline figure stays in sync with latest entry
     track('weight_logged');
     _markDirty();
     notifyListeners();
@@ -218,7 +221,12 @@ class PulseStore extends ChangeNotifier {
   void deleteWeight(DateTime date) {
     weights.removeWhere((w) =>
         w.date.year == date.year && w.date.month == date.month && w.date.day == date.day);
-    if (weights.isNotEmpty) currentWeightLive = weights.last.kg;
+    if (weights.isNotEmpty) {
+      currentWeightLive = weights.last.kg;
+      currentWeight = weights.last.kg;
+    } else {
+      currentWeightLive = null; // fall back to profile default
+    }
     track('weight_deleted');
     _markDirty();
     notifyListeners();
