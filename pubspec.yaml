@@ -31,10 +31,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # ── Phase 2: local-first persistence (no external DB) ────────────
+  # JSON snapshot store on top of platform prefs/files. Deliberately
+  # dependency-light so it works on every Flutter target; can be
+  # swapped for sqflite later behind the same repository interface.
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

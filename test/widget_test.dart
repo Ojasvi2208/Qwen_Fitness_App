@@ -1,30 +1,62 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulse_app/data/persistence/local_backend.dart';
+import 'package:pulse_app/data/pulse_store.dart';
 import 'package:pulse_app/main.dart';
 
+/// E2E-style flow tests (Phase 2): UI interactions must drive the
+/// persisted store, and a restarted app must show the same numbers.
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  Future<PulseStore> hydratedStore() async {
+    final store = PulseStore();
+    await store.attachPersistence(SharedPreferencesLocalRepository());
+    return store;
+  }
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('FLOW B — food logging updates totals and persists', (tester) async {
+    final store = await hydratedStore();
+    await tester.pumpWidget(PulseApp(store: store));
+    await tester.pumpAndSettle();
+
+    // Direct store mutation mirrors what FoodDetailScreen's button does,
+    // then verifies the reactive totals used across Today/Diary cards.
+    final kcalBefore = store.foodKcal;
+    store.addFood(PulseData.foodById('f3'), 1, MealType.dinner);
     await tester.pump();
+    expect(store.foodKcal, greaterThan(kcalBefore));
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await store.flushPendingSave();
+    final revived = await hydratedStore();
+    expect(revived.diary.length, store.diary.length);
+    expect(revived.foodKcal, closeTo(store.foodKcal, 0.001));
+  });
+
+  testWidgets('FLOW — water quick log persists across restart', (tester) async {
+    final store = await hydratedStore();
+    await tester.pumpWidget(PulseApp(store: store));
+    await tester.pumpAndSettle();
+
+    store.addWater(0.25);
+    await tester.pump();
+    expect(store.waterLogged, closeTo(1.95, 0.001)); // 1.7 seeded + 0.25
+
+    await store.flushPendingSave();
+    final revived = await hydratedStore();
+    expect(revived.waterLogged, closeTo(store.waterLogged, 0.001));
+  });
+
+  testWidgets('app boots inside PulseScope without persistence attached',
+      (tester) async {
+    // Regression guard for the old default-counter test: PulseApp must
+    // render its splash, not throw on missing scope.
+    await tester.pumpWidget(const PulseApp());
+    await tester.pump();
+    expect(find.byType(PulseScope), findsOneWidget);
   });
 }
