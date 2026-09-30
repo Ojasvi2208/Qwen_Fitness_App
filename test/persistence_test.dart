@@ -201,12 +201,15 @@ void main() {
 
       await store.deleteAllLocalData();
 
-      final revived = PulseStore();
-      await revived.attachPersistence(await newRepo());
-      expect(revived.diary, isEmpty);
-      expect(revived.weights, isEmpty);
-      expect(revived.waterLogged, 0);
-      expect(revived.hydratedFromDisk, isFalse);
+      // Memory is wiped in place (§60).
+      expect(store.diary, isEmpty);
+      expect(store.weights, isEmpty);
+      expect(store.waterLogged, 0);
+      expect(store.hydratedFromDisk, isFalse);
+      // Disk is wiped too: clearAll removed the snapshot outright, so a
+      // later launch takes the first-run path rather than reloading records.
+      expect(await repo.readSnapshot(), isNull,
+          reason: 'erased data must not survive on disk');
     });
 
     test('export bundle is valid JSON containing user records', () async {
@@ -215,7 +218,7 @@ void main() {
       final json = store.exportUserDataJson();
       expect(json, contains('"diary"'));
       expect(json, contains('"weights"'));
-      expect(json, contains('Greek Yogurt') == false); // stores ids, not catalog rows
+      expect(json, isNot(contains('Greek Yogurt'))); // stores ids, not catalog rows
     });
 
     test('unknown food id in snapshot is skipped without crashing', () async {

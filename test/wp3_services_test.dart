@@ -175,7 +175,8 @@ void main() {
       r.hour = 18;
       expect(r.timeLabel, '6:30 PM');
       r.hour = 0;
-      expect(r.timeLabel, '12:00 AM');
+      expect(r.timeLabel, '12:30 AM'); // midnight keeps its minute
+
     });
     test('repeat modes fire on correct weekdays', () {
       final daily = Reminder(id: 'a', title: 'x', body: 'y', hour: 8, minute: 0);
@@ -247,7 +248,8 @@ void main() {
       await s.flushPendingSave();
       await s.deleteAllLocalData();
       expect(s.reminders.book.all, isEmpty);
-      expect(s.habitEnabled['Water'], false); // catalog default was off? no — default true
+      expect(s.habitEnabled['Water'], true,
+          reason: 'erasure restores the catalog default, which is on');
     }, skip: false);
 
     test('v3 snapshots hydrate cleanly into v4 store (additive migration)', () async {

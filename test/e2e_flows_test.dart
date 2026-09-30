@@ -119,6 +119,7 @@ void main() {
       final kcal = store.foodKcal;
       final protein = store.protein;
       final count = store.diary.length;
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.diary.length, count);
       expect(store.foodKcal, closeTo(kcal, 0.001));
@@ -207,6 +208,7 @@ void main() {
       final finished = store.finishWorkout();
       final histLen = store.sessions.history.length;
       final burned = store.activityCaloriesBurned;
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.sessions.history.length, histLen);
       expect(store.sessions.history.first.templateName,
@@ -283,6 +285,7 @@ void main() {
         g.proteinGoal = 150;
         g.targetWeightKg = 74;
       });
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.goals.proteinGoal, 150);
       expect(store.goals.targetWeightKg, closeTo(74, 0.001));
@@ -302,6 +305,7 @@ void main() {
       var store = await bootFresh(repo);
       store.setUnitsWeight('lb');
       store.setUnitsDistance('mi');
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.unitsMass, 'lb');
       expect(store.unitsDistance, 'mi');
@@ -335,6 +339,7 @@ void main() {
       final repo = _MemRepo();
       var store = await bootFresh(repo);
       await store.purchasePro(PulsePricing.yearly);
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.premium, isTrue);
       expect(store.plan, PulsePlan.proYearly);
