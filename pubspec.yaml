@@ -40,6 +40,9 @@ dependencies:
   # dependency-light so it works on every Flutter target; can be
   # swapped for sqflite later behind the same repository interface.
   shared_preferences: ^2.3.2
+  in_app_purchase: ^3.3.1
+  google_mobile_ads: ^9.1.0
+  flutter_local_notifications: ^22.3.1
 
 dev_dependencies:
   flutter_test:
