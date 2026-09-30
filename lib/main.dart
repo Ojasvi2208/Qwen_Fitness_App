@@ -67,6 +67,11 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
         state == AppLifecycleState.detached) {
       _store.flushPendingSave();
     }
+    // Monetization hygiene: settle any expired trial when the app resumes so
+    // entitlements (and ad visibility) are correct without waiting for a tap.
+    if (state == AppLifecycleState.resumed) {
+      _store.settleSubscription();
+    }
   }
 
   @override
