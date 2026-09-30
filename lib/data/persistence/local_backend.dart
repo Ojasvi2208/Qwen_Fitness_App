@@ -23,7 +23,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///  * privacy: everything stays on-device; nothing leaves the app
 /// ═══════════════════════════════════════════════════════════════════
 
-const int kPulseSchemaVersion = 1;
+// v2: additive `workouts` block (WP3.1 session engine). v1 snapshots
+// still load — the block is optional and defaults to empty history.
+const int kPulseSchemaVersion = 2;
 const String kSnapshotKey = 'pulse.snapshot.v1';
 const String kMetaKey = 'pulse.meta.v1';
 
@@ -124,6 +126,14 @@ class AutosaveCoordinator {
     _dirty = true;
     _timer?.cancel();
     _timer = Timer(interval, () => flush());
+  }
+
+  /// Drop any scheduled write and dirty flag (used by data deletion so
+  /// a wipe isn't immediately followed by an autosave rewrite).
+  void cancelPending() {
+    _timer?.cancel();
+    _timer = null;
+    _dirty = false;
   }
 
   /// Completes once all pending writes are on disk (including writes

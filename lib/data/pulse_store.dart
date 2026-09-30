@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'persistence/local_backend.dart';
+import 'workout_session.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// PULSE APP STATE — lightweight InheritedNotifier store (no external
@@ -134,6 +135,58 @@ class PulseStore extends ChangeNotifier {
   double stepsToday = 6842;
   double waterLogged = 1.7; // liters
   int workoutsCompletedToday = 1;
+
+  /// ── WP3.1 Workout Session Engine ────────────────────────────────
+  /// Single source of truth for active + completed sessions. Every
+  /// mutation persists via autosave and notifies listeners.
+  late final WorkoutSessionManager sessions =
+      WorkoutSessionManager(onChanged: () {
+    _markDirty();
+    notifyListeners();
+  });
+
+  /// Start a workout for [templateName]; returns the live session.
+  WorkoutSession startWorkout(String templateName) {
+    track('workout_started');
+    return sessions.start(templateName);
+  }
+
+  /// Record one completed set (Active Workout screen).
+  SetRecord logSet({required int exerciseIndex, required int setNumber,
+      required int reps, required double weightKg}) =>
+      sessions.logSet(
+          exerciseIndex: exerciseIndex,
+          setNumber: setNumber,
+          reps: reps,
+          weightKg: weightKg);
+
+  /// Undo the last logged set — symmetric with logSet (§76 undo).
+  SetRecord? undoLastSet() => sessions.undoLastSet();
+
+  /// Rate the most recently completed session (Workout Complete screen).
+  void rateLastWorkout(int rating) {
+    if (sessions.history.isEmpty) return;
+    final s = sessions.history.first; // newest-first view
+    // mutate through a manager-level API so autosave fires
+    sessions.rate(s.id, rating);
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Finish (complete or end-early) the active session, credit derived
+  /// calories, bump today's workout count, and persist everything.
+  WorkoutSession? finishWorkout({int? rating}) {
+    final s = sessions.finish(rating: rating);
+    if (s == null) return null;
+    if (s.totalSets > 0) {
+      activityCaloriesBurned += s.estimatedKcal;
+      workoutsCompletedToday += 1;
+    }
+    track('workout_completed');
+    _markDirty();
+    notifyListeners();
+    return s;
+  }
 
   /// Weigh-in history (local-first). Seeded with the sample trend so
   /// charts have data on first launch; new entries are appended live.
@@ -306,7 +359,10 @@ class PulseStore extends ChangeNotifier {
   }
 
   /// Analytics seam — behavior events only, never raw health values.
+  /// Tests (and a future real SDK) can attach a sink to observe events.
+  void Function(String event)? analyticsSink;
   void track(String event, [Map<String, String>? props]) {
+    analyticsSink?.call(event);
     debugPrint('📊 pulse_analytics → $event ${props ?? ''}');
   }
 
@@ -423,6 +479,10 @@ class PulseStore extends ChangeNotifier {
         _ => themeMode,
       };
     }
+    // schema v2 block — absent in v1 snapshots → empty history (safe).
+    sessions.hydrate(s['workouts'] is Map
+        ? (s['workouts'] as Map).cast<String, dynamic>()
+        : null);
     notifyListeners();
   }
 
@@ -447,6 +507,7 @@ class PulseStore extends ChangeNotifier {
         'steps': stepsToday,
         'activityKcal': activityCaloriesBurned,
         'workoutsToday': workoutsCompletedToday,
+        'workouts': sessions.toJson(),
         'premium': premium,
         'offline': offlineMode,
         'units': {
@@ -476,6 +537,7 @@ class PulseStore extends ChangeNotifier {
     activityCaloriesBurned = 0;
     workoutsCompletedToday = 0;
     currentWeightLive = null;
+    sessions.discardActive(); // active session lives in memory + disk — wipe both
     _hydratedFromDisk = false;
     final repo = _repository;
     if (repo != null) {
@@ -487,6 +549,9 @@ class PulseStore extends ChangeNotifier {
         buildSnapshot: toSnapshot,
       );
     }
+    // clearAll removed the snapshot; stop the just-recreated coordinator
+    // from immediately rewriting a (now-empty-but-seeded) snapshot.
+    _autosave?.cancelPending();
     track('data_deleted');
     notifyListeners();
   }

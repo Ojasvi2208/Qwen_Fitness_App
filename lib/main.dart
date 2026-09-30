@@ -162,7 +162,7 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     case '/workout-detail':
       page = WorkoutDetailScreen(workoutName: settings.arguments is String ? settings.arguments as String : 'Upper Body Strength');
     case '/active-workout':
-      page = const ActiveWorkoutScreen();
+      page = ActiveWorkoutScreen(workoutName: settings.arguments is String ? settings.arguments as String : 'Upper Body Strength');
     case '/exercise-instructions':
       page = ExerciseInstructionsScreen(exerciseName: settings.arguments is String ? settings.arguments as String : 'Dumbbell Bench Press');
     case '/workout-complete':
