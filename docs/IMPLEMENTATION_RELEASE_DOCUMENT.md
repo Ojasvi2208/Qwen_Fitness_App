@@ -19,7 +19,7 @@ PULSE is a complete fitness + nutrition application implemented as a production-
 | 2 | Local persistence: repository pattern, autosave, hydration, privacy delete/export | ✅ Complete (`d1829c1`, `5d8ca09`) |
 | 3 | Domain hardening: workout sessions, nutrition service, units, measurements/photos, streaks/reports/goal-review, reminders | ✅ Complete (`0854bb3`, `7443ce8`, `56b97d6`) |
 | 4 | Monetization & ads: entitlements engine, pricing, trial lifecycle, ad policy/slots, gateway seams | ✅ Complete (`a09ca97`, `6cb6250`) |
-| 5 | E2E flow tests (A–G) + master-flow regression suite | 🟡 WP5.1 committed (`7c66e7e`); WP5.2 state-matrix & WP5.3 accessibility sweeps pending |
+| 5 | E2E flow tests (A–G) + master-flow regression suite | 🟡 WP5.1 committed (`7c66e7e`); WP5.2 state-matrix sweep + `docs/PHASE5_TEST_PLAN.md` committed; WP5.3 accessibility sweeps pending |
 | 6 | Release prep: real In-App Purchase + AdMob adapters, receipt validation, deep links, flavors, platform config | ⬜ Not started |
 | 7 | Final documentation polish (this doc is the anchor deliverable) | 🟡 In progress |
 | — | **QA / test execution** | ⏳ Deferred to local machine (no Flutter SDK in authoring sandbox) |
@@ -73,7 +73,7 @@ pulse_app/
     └── e2e_flows_test.dart          (447)  30 tests: FLOW A–G service-level journeys incl. restart assertions, undo symmetry, destructive-action protection, paywall compliance
 ```
 
-**Totals:** ~10,800 lines of app code across 24 Dart files; ~2,000 lines of tests across 7 files; **135 declared test cases**; zero runtime dependencies beyond `shared_preferences`.
+**Totals:** ~10,800 lines of app code across 24 Dart files; ~2,400 lines of tests across 8 files; **182 test cases** (all passing); zero runtime dependencies beyond `shared_preferences`.
 
 ---
 
@@ -125,13 +125,17 @@ pulse_app/
 |---|---|---|---|
 | persistence_test | 18 | Unit + integration (mocked prefs) | round-trip losslessness, corrupt/future-schema, restart-consistency per feature, debounce |
 | workout_session_test | 19 | Unit | stats math, undo symmetry, early end, persistence across restart |
-| wp3_services_test | 24 | Unit | nutrition equation, all 4 unit conversions, streak edge cases (empty day, midnight rollover), weekly report numbers, goal-review thresholds, reminder CRUD |
+| wp3_services_test | 25 | Unit | nutrition equation, all 4 unit conversions, streak edge cases (empty day, midnight rollover), weekly report numbers, goal-review thresholds, reminder CRUD |
 | wp33_measurements_photos_test | 16 | Unit | upsert-not-duplicate, trend computation, photo record+file atomic delete |
 | monetization_test | 25 | Unit | trial start/expiry/auto-downgrade, one-shot guard, Pro hides ads, snapshot round-trip, legacy bool migration, failed purchase keeps prior state, delete-all erases entitlements |
-| e2e_flows_test | 30 | Service-level E2E | FLOW A new-user → dashboard; B food log → updated totals; C meal-scan confirm path; D workout start→sets→complete stats; E progress ranges; F goal edit → recalculated targets → persist; G premium journey incl. paywall-viewed event; cross-flow consistency guards |
+| e2e_flows_test | 32 | Service-level E2E | FLOW A new-user → dashboard; B food log → updated totals; C meal-scan confirm path; D workout start→sets→complete stats; E progress ranges; F goal edit → recalculated targets → persist; G premium journey incl. paywall-viewed event; cross-flow consistency guards |
 | widget_test | 3 | Widget | app boots in PulseScope; FLOW B through real widgets; water quick-log survives restart |
+| state_matrix_test | 44 | Widget | WP5.2 sweep — 7 screens × 5 states {first-run, empty, populated, premium-locked, offline} + per-state guarantees (§87) |
 
-**Declared total: 135 test cases** (132 `test(` + 3 `testWidgets(`; the per-suite column above sums to 135). Pass rate requirement for release gate: **100%** (zero failures allowed; flaky = bug).
+**Measured total: 182 test cases**, all passing as of 2026-10-01 on Flutter 3.47.5.
+Pass rate requirement for release gate: **100%** (zero failures allowed; flaky = bug).
+Per-suite detail and the deferred-state rationale live in
+[docs/PHASE5_TEST_PLAN.md](PHASE5_TEST_PLAN.md).
 
 ---
 
@@ -178,7 +182,7 @@ pulse_app/
 git clone <your-repo-url> pulse_app && cd pulse_app
 flutter pub get
 flutter analyze            # GATE: 0 errors required (warnings triaged, not ignored)
-flutter test               # GATE: 135/135 pass — pass-rate requirement = 100%
+flutter test               # GATE: 182/182 pass — pass-rate requirement = 100%
 flutter test --coverage && lcov --summary coverage/lcov.info   # target ≥80% on lib/data/**
 flutter run -d <device>    # smoke: FLOW B (log food ≤4 taps), water +250 ml, kill app, relaunch → values persisted
 ```

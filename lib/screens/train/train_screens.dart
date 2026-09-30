@@ -33,12 +33,16 @@ class TrainScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text('Upper Body Strength', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: PulseSpacing.xs),
-            const Row(children: [
-              Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
-              SizedBox(width: PulseSpacing.m),
-              Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
-              SizedBox(width: PulseSpacing.m),
-              Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
+            const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
+              ]),
             ]),
             const SizedBox(height: PulseSpacing.m),
             PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
@@ -87,13 +91,16 @@ class TrainScreen extends StatelessWidget {
               Expanded(flex: 2,
                   child: Container(width: double.infinity, decoration: BoxDecoration(gradient: LinearGradient(colors: [PulseColors.primary.withOpacity(0.7), PulseColors.secondary.withOpacity(0.8)])),
                       child: const Padding(padding: EdgeInsets.all(10), child: Icon(Icons.fitness_center_rounded, color: Colors.white54, size: 30)))),
-              Expanded(flex: 2,
+              Expanded(flex: 3,
                   child: Padding(
                     padding: const EdgeInsets.all(PulseSpacing.sm),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(w.name, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontSize: 14.5), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const Spacer(),
-                      Text('${w.minutes} min • ${w.level}', style: Theme.of(c).textTheme.labelSmall),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                      Flexible(
+                          child: Text(w.name, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontSize: 14.5), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                      Text('${w.minutes} min • ${w.level}', style: Theme.of(c).textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                     ]),
                   )),
             ]),
