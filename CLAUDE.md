@@ -12,10 +12,12 @@ No SDK ships with this repo. On this machine:
 
 - **Flutter 3.47.5 / Dart 3.13.4** at `~/development/flutter`, on `PATH` via
   `~/.zshrc`. Verify with `flutter --version`.
-- **`flutter doctor` is green for Flutter, Chrome and network only.** Xcode and
-  the Android SDK are **not installed**. `flutter analyze` and `flutter test`
-  are headless and do not need them; device builds and every Phase 6 platform
-  plugin do.
+- **Android SDK** at `/opt/homebrew/share/android-commandlinetools` (platform 36,
+  build-tools 36.0.0), `ANDROID_HOME` set in `~/.zshrc`. `flutter doctor` is
+  green for Android. Emulator AVD: `pulse_pixel7` (API 36, Play Store image —
+  Ads and In-App Purchase need Play Services).
+- **Xcode is NOT installed** and cannot be from a terminal (App Store only,
+  needs an Apple ID and `sudo`). All iOS work is unverified.
 - **graphify** lives under Python 3.14 (`/opt/homebrew/opt/python@3.14/bin/python3.14`),
   *not* the shell's aliased `python3` (3.11). Checking its deps under 3.11
   falsely reports everything missing — do not "fix" that. `graphify-out/` is
@@ -103,11 +105,24 @@ Plain prose matching the existing log. **Never** a `Co-Authored-By` trailer, and
 never a mention of Claude, Anthropic or any other AI tool. Explain *why*, not
 just what.
 
-## Phase 6 prerequisite
+## Phase 6
 
-Every remaining Phase 6 item is a platform plugin — `in_app_purchase`,
-`google_mobile_ads`, `flutter_local_notifications`, HealthKit / Health Connect,
-`mobile_scanner`, `path_provider`. **Xcode or Android Studio must be installed
-before those dependencies can resolve, build or be verified.** Adapters can be
-written and unit-tested against fakes without them, but nothing native runs
-until a toolchain exists.
+`in_app_purchase`, `google_mobile_ads` and `flutter_local_notifications` are
+declared and compile into the APK. The app builds, installs and runs on the
+emulator. Their adapters live in `lib/data/platform/`, each behind a narrow
+backend seam so the app-side rules are testable without the plugin.
+
+**Still unverified**: no real purchase, ad impression or notification has
+occurred, and nothing on iOS. The AdMob ids in `AndroidManifest.xml` and
+`AdUnitIds` are Google's **test** ids — a release build must override both.
+
+Build and run:
+
+```bash
+emulator -avd pulse_pixel7 -no-snapshot-save -no-boot-anim &
+adb wait-for-device && flutter run
+```
+
+**A passing suite does not mean the app starts.** `google_mobile_ads` crashed
+the process at launch over a missing manifest id while `analyze` and `test`
+were both clean. Launch it before claiming anything works.

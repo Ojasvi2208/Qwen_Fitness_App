@@ -6,20 +6,19 @@ importantly — **what has not been verified and why**.
 
 Last updated: 2026-10-01
 
-## The constraint
+## Toolchain
 
-Neither Xcode nor the Android SDK is installed on the machine this work was done
-on. `flutter doctor` is green for Flutter, Chrome and network only.
+**Android is installed and green.** Command-line tools, platform 36 and
+build-tools 36.0.0 via Homebrew and `sdkmanager`; `ANDROID_HOME` is set in
+`~/.zshrc`. A Pixel 7 AVD (`pulse_pixel7`, API 36, **Play Store** image — Ads
+and In-App Purchase need Play Services) runs the app.
 
-Phase 5 was unaffected: `flutter analyze` and `flutter test` are headless. Phase
-6 is not. Adding `in_app_purchase` or `google_mobile_ads` to `pubspec.yaml`
-triggers a CocoaPods install on iOS and a Gradle sync on Android, neither of
-which can run here.
+**Xcode is not installed**, and cannot be from a terminal: it is App Store only
+and needs an Apple ID, a GUI and `sudo xcode-select`. Everything iOS —
+StoreKit, HealthKit, APNs — is therefore unverified.
 
-**So the plugins are deliberately not yet in `pubspec.yaml`.** The adapters are
-written against narrow backend seams instead, which keeps the app building, the
-suite green and the app-side logic genuinely tested. Wiring the real plugin is
-then a small, well-defined change.
+The three plugins are declared in `pubspec.yaml` and compile into the APK. The
+app builds, installs and runs on the emulator.
 
 ## What exists
 
@@ -55,18 +54,41 @@ calls this app needs. That is what makes the app-side rules testable:
   refused permission cancels everything and returns; reminders stay in the book
   and simply do not fire, per §58.
 
+## What the toolchain proved
+
+Making a build possible immediately exposed five defects that `analyze` and
+`test` are structurally blind to. Four were in the Android scaffold, unchanged
+since the project was generated, and one only appears at runtime:
+
+| Defect | Was | Now |
+|---|---|---|
+| Gradle incompatible with Java 21, below Flutter's minimum 8.14.0 | 8.3 | 8.14.3 |
+| Android Gradle Plugin below the required 8.11.1 | 8.1.0 | 8.11.1 |
+| Kotlin below the required 2.2.20 | 1.8.22 | 2.2.20 |
+| `flutter_local_notifications` needs core library desugaring (`java.time`) | off | enabled, Java 8 → 11 |
+| `google_mobile_ads` crashes at process start without an AdMob app id | missing | test id in the manifest |
+
+The last one is worth dwelling on: the APK built and installed cleanly, the
+suite passed 224/224, and the app still died before rendering a frame. Only
+launching it revealed that.
+
+Running on the emulator also confirmed the §14 launch gate on a real device:
+the app opens on the welcome screen, not a dashboard, because `hasProfile` is
+false on a fresh install — exactly what `state_matrix_test` asserts.
+
 ## What is NOT verified
 
-Stated plainly, because the distinction matters:
+Stated plainly, because the distinction still matters:
 
 - **No real purchase, ad impression, notification or health read has occurred.**
-  Every test above runs against a hand-written fake.
-- The plugins are **not** in `pubspec.yaml`, so native dependency resolution is
-  untested.
-- No device or simulator build has been attempted.
-- StoreKit and Play Billing product configuration, AdMob account setup, APNs
-  entitlements and Android 13+ POST_NOTIFICATIONS runtime flow are all
-  **untouched** — they are console and platform work, not code.
+  Every adapter test runs against a hand-written fake. The plugins compile and
+  the app runs; their behaviour is not yet exercised.
+- **Nothing on iOS.** No CocoaPods install, no simulator build, no StoreKit.
+- Store-console work is **untouched**: Play Billing and App Store product
+  configuration, a real AdMob account, APNs entitlements, and the Android 13+
+  POST_NOTIFICATIONS runtime permission flow.
+- The AdMob ids in the manifest and in `AdUnitIds` are Google's **test** ids. A
+  release build must override both.
 
 ## Remaining Phase 6 items (§7.3)
 
@@ -82,13 +104,22 @@ Not started, all requiring a toolchain:
   ProGuard rules, minSdk 23, iOS 15.
 - **Flavors, deep links, legal pages** (items 12–14).
 
-## Next session
+## Running it
 
-1. Install Xcode **or** Android Studio and get `flutter doctor` green for one.
-2. Add the three plugins to `pubspec.yaml`, then `flutter pub get`.
-3. Implement the concrete backends — `InAppPurchaseBackend`,
+```bash
+emulator -avd pulse_pixel7 -no-snapshot-save -no-boot-anim &
+adb wait-for-device
+flutter run                     # or: flutter build apk --debug && adb install -r …
+```
+
+## Next
+
+1. Implement the concrete backends — `InAppPurchaseBackend`,
    `GoogleMobileAdsBackend`, `FlutterLocalNotificationsBackend` — as thin
-   translations. The adapters and their tests do not change.
-4. Wire them in `main.dart` behind a flavor or `--dart-define`, keeping the
-   stubs for tests.
-5. Only then claim any of this verified.
+   translations of the plugin APIs. The adapters and their tests do not change.
+2. Wire them in `main.dart` behind a flavor or `--dart-define`, keeping the
+   stubs as the default for tests.
+3. Exercise each on the emulator: a test-inventory banner, a scheduled
+   notification, a Play Billing test purchase.
+4. Install Xcode when iOS matters, then repeat for StoreKit and HealthKit.
+5. Only claim verified what has actually been observed running.

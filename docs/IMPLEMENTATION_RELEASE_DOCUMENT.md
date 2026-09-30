@@ -20,7 +20,7 @@ PULSE is a complete fitness + nutrition application implemented as a production-
 | 3 | Domain hardening: workout sessions, nutrition service, units, measurements/photos, streaks/reports/goal-review, reminders | ✅ Complete (`0854bb3`, `7443ce8`, `56b97d6`) |
 | 4 | Monetization & ads: entitlements engine, pricing, trial lifecycle, ad policy/slots, gateway seams | ✅ Complete (`a09ca97`, `6cb6250`) |
 | 5 | E2E flow tests (A–G) + master-flow regression suite | ✅ Complete — WP5.1 (`7c66e7e`), WP5.2 state-matrix sweep + `docs/PHASE5_TEST_PLAN.md`, WP5.3 accessibility sweeps |
-| 6 | Release prep: real In-App Purchase + AdMob adapters, receipt validation, deep links, flavors, platform config | 🟡 Billing/ads/notification adapters written and unit-tested against fakes; **nothing platform-verified** — no toolchain installed. Health, camera, photo IO, signing and flavors not started. See [docs/PHASE6_STATUS.md](PHASE6_STATUS.md) |
+| 6 | Release prep: real In-App Purchase + AdMob adapters, receipt validation, deep links, flavors, platform config | 🟡 Android toolchain green; plugins declared and compiling; app builds, installs and runs on a Pixel 7 emulator. Adapters still fake-backed — **no real purchase, impression or notification yet**, and nothing on iOS (no Xcode). Health, camera, photo IO, signing and flavors not started. See [docs/PHASE6_STATUS.md](PHASE6_STATUS.md) |
 | 7 | Final documentation polish (this doc is the anchor deliverable) | 🟡 In progress |
 | — | **QA / test execution** | ⏳ Deferred to local machine (no Flutter SDK in authoring sandbox) |
 
