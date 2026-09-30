@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/monetization.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -56,7 +57,12 @@ class ProfileScreen extends StatelessWidget {
           (title: 'Notifications', icon: Icons.notifications_rounded, route: '/notification-settings', detail: 'Reminders by category and time'),
           (title: 'Appearance', icon: Icons.dark_mode_rounded, route: null, detail: 'Theme · larger text'),
           (title: 'Privacy', icon: Icons.lock_rounded, route: '/privacy', detail: 'Your data, your control'),
-          (title: 'Subscription', icon: Icons.workspace_premium_rounded, route: '/subscription', detail: store.premium ? 'PULSE Pro · yearly' : 'Free plan'),
+          (title: 'Subscription', icon: Icons.workspace_premium_rounded, route: '/subscription', detail: switch (store.plan) {
+            PulsePlan.proYearly => 'PULSE Pro · yearly',
+            PulsePlan.proMonthly => 'PULSE Pro · monthly',
+            PulsePlan.proTrial => 'Pro trial · active',
+            PulsePlan.free => 'Free plan',
+          }),
           (title: 'Help & Support', icon: Icons.help_outline_rounded, route: '/help', detail: 'FAQs · contact · about'),
           (title: 'Account', icon: Icons.person_outline_rounded, route: '/personal-details', detail: 'Email · units · sign out'),
         ])
@@ -71,6 +77,7 @@ class ProfileScreen extends StatelessWidget {
                   : _appearanceSheet(context, store),
             ),
           ),
+        const AdBanner(slot: AdSlot.homeFooter), // free tier only — Pro removes ads
         const SizedBox(height: PulseSpacing.m),
         OutlinedButton.icon(onPressed: () async {
           final ok = await pulseConfirm(context,

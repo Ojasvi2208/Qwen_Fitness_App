@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../data/measurements.dart';
+import '../../data/progress_photos.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -417,16 +419,9 @@ class MeasurementsScreen extends StatefulWidget {
 }
 
 class _MeasurementsScreenState extends State<MeasurementsScreen> {
-  final Map<String, ({String value, String change})> _data = {
-    'Weight': (value: '79.8 kg', change: '−4.7 kg'),
-    'Body Fat %': (value: '21.4 %', change: '−2.1 %'),
-    'Waist': (value: '88 cm', change: '−3 cm'),
-    'Chest': (value: '101 cm', change: '−1 cm'),
-    'Hips': (value: '99 cm', change: '−2 cm'),
-    'Arms': (value: '33 cm', change: '+0.5 cm'),
-    'Thighs': (value: '56 cm', change: '−1 cm'),
-    'Neck': (value: '38 cm', change: '±0 cm'),
-  };
+  // WP3.3 — backed by the persisted MeasurementBook (§45). Weight is a
+  // row for context only (it lives in the weight log); every other row
+  // reads live store data and updates immediately after a new entry.
   bool _loading = true;
 
   @override
@@ -442,64 +437,119 @@ class _MeasurementsScreenState extends State<MeasurementsScreen> {
       title: 'Measurements',
       actions: [IconButton3(icon: Icons.add_rounded, selected: true, tooltip: 'Add measurement',
           onTap: () => _addMeasurement(context))],
-      body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        for (final e in _data.entries)
+      body: Builder(builder: (_) {
+        final store = _.pulse;
+        final rows = <(String, String, double, bool)>[
+          ('Weight', '${store.displayWeight.toStringAsFixed(1)} kg', 0, true), // trend lives on Weight screen
+          for (final site in store.measurements.sites)
+            if (store.measurements.latestFor(site.id) != null)
+              (site.label,
+               '${store.measurements.latestFor(site.id)!.value.toStringAsFixed(1)} ${site.unit}',
+               measurementTrend(store.measurements.historyFor(site.id)).delta,
+               site.lowerIsBetter),
+        ];
+        return ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
+        for (final r in rows)
           Card(
             child: ListTile(
               leading: CircleAvatar(radius: 17, backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: Icon(Icons.straighten_rounded, size: 17, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-              title: Text(e.value.value, style: PulseTypography.metricSmall.copyWith(color: Theme.of(context).colorScheme.onSurface, fontSize: 17)),
-              subtitle: Text(e.key),
-              trailing: TrendIndicator(changeKg: double.tryParse(e.value.change.replaceAll(RegExp('[^0-9.\\-+]'), '')) ?? 0,
-                  goodWhenNegative: e.key != 'Arms', label: ''),
-              onTap: () => _editMeasurement(context, e.key),
+                  child: Icon(r.$1 == 'Weight' ? Icons.monitor_weight_rounded : Icons.straighten_rounded, size: 17, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+              title: Text(r.$2, style: PulseTypography.metricSmall.copyWith(color: Theme.of(context).colorScheme.onSurface, fontSize: 17)),
+              subtitle: Text(r.$1),
+              trailing: r.$1 == 'Weight'
+                  ? Text('−4.7 kg total', style: Theme.of(context).textTheme.bodySmall)
+                  : TrendIndicator(changeKg: r.$3, goodWhenNegative: r.$4, label: ''),
+              onTap: () => _editMeasurement(context, r.$1),
             ),
           ),
         const SizedBox(height: PulseSpacing.m),
-        TertiaryButton(label: '+ Add custom measurement', onTap: () => _addMeasurement(context)),
+        TertiaryButton(label: '+ Add custom measurement', onTap: () => _addCustom(context)),
         const SizedBox(height: PulseSpacing.s),
         Text('Measurements are private to your account and excluded from any shared report unless you choose it.',
             style: Theme.of(context).textTheme.bodySmall),
-      ]),
+      ]);
+      }),
     );
   }
 
-  void _addMeasurement(BuildContext context) {
-    final name = TextEditingController();
+  void _addMeasurement(BuildContext context, {String? presetSiteId}) {
+    final store = context.pulse;
+    final siteIds = store.measurements.sites.map((s) => s.id).toList();
+    String siteId = presetSiteId ?? (_selectedSite ?? siteIds.first);
     final val = TextEditingController();
-    pulseSheet(context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => Padding(
-      padding: const EdgeInsets.all(PulseSpacing.l),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SheetHeader(title: 'New measurement'),
-        TextField(controller: name, decoration: InputDecoration(labelText: 'Name', errorText: name.text.isEmpty && val.text.isNotEmpty ? 'Give it a name' : null), onChanged: (_) => set(() {})),
-        const SizedBox(height: PulseSpacing.m),
-        TextField(controller: val, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Value', suffixText: 'cm',
-                errorText: val.text.isNotEmpty && double.tryParse(val.text) == null ? 'Enter a valid number' : null),
-            onChanged: (_) => set(() {})),
-        const SizedBox(height: PulseSpacing.m),
-        PrimaryButton(label: 'Save', onTap: () {
-          final v = double.tryParse(val.text);
-          if (name.text.trim().isEmpty || v == null) {
-            set(() {});
-            return;
-          }
-          ctx.pulse.track('measurement_logged');
-          Navigator.pop(ctx);
-          pulseSnack(context, '${name.text} saved at $v cm', icon: Icons.straighten_rounded);
-        }),
-      ]),
-    )));
+    pulseSheet(context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+      final unit = store.measurements.sites.firstWhere((s) => s.id == siteId).unit;
+      return Padding(
+        padding: const EdgeInsets.all(PulseSpacing.l),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SheetHeader(title: 'Log measurement', subtitle: 'Adds today’s entry — history is kept.'),
+          DropdownButtonFormField<String>(
+            value: siteId,
+            items: [for (final id in siteIds)
+              DropdownMenuItem(value: id, child: Text(store.measurements.sites.firstWhere((s) => s.id == id).label))],
+            onChanged: (v) { if (v != null) { siteId = v; set(() {}); } },
+          ),
+          const SizedBox(height: PulseSpacing.m),
+          TextField(controller: val, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: 'Value', suffixText: unit,
+                  errorText: val.text.isNotEmpty && double.tryParse(val.text) == null ? 'Enter a valid number' : null),
+              onChanged: (_) => set(() {})),
+          const SizedBox(height: PulseSpacing.m),
+          PrimaryButton(label: 'Save', onTap: () {
+            final v = double.tryParse(val.text);
+            if (v == null || !store.logMeasurement(siteId, v)) { set(() {}); return; }
+            Navigator.pop(ctx);
+            pulseSnack(context, 'Saved to today’s measurements', icon: Icons.check_rounded);
+          }),
+        ]),
+      );
+    }));
   }
 
-  void _editMeasurement(BuildContext context, String key) {
-    pulseSheet(context, builder: (ctx) => Padding(
-      padding: const EdgeInsets.all(PulseSpacing.l),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        SheetHeader(title: 'Update $key', subtitle: 'Adds a new dated entry — history is kept.'),
-        PrimaryButton(label: 'Enter new value', onTap: () { Navigator.pop(ctx); _addMeasurement(context); }),
-      ]),
-    ));
+  String? _selectedSite;
+
+  void _addCustom(BuildContext context) {
+    final store = context.pulse;
+    final name = TextEditingController();
+    final val = TextEditingController();
+    pulseSheet(context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+      final nameErr = name.text.trim().isNotEmpty &&
+              store.measurements.sites.any((s) => s.label.toLowerCase() == name.text.trim().toLowerCase())
+          ? 'You already track this' : null;
+      return Padding(
+        padding: const EdgeInsets.all(PulseSpacing.l),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SheetHeader(title: 'New measurement'),
+          TextField(controller: name, decoration: InputDecoration(labelText: 'Name', errorText: nameErr), onChanged: (_) => set(() {})),
+          const SizedBox(height: PulseSpacing.m),
+          TextField(controller: val, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: 'Value', suffixText: 'cm',
+                  errorText: val.text.isNotEmpty && double.tryParse(val.text) == null ? 'Enter a valid number' : null),
+              onChanged: (_) => set(() {})),
+          const SizedBox(height: PulseSpacing.m),
+          PrimaryButton(label: 'Save', onTap: () {
+            final v = double.tryParse(val.text);
+            final label = name.text.trim();
+            if (label.isEmpty || v == null || nameErr != null) { set(() {}); return; }
+            if (!store.addMeasurementSite(label)) { set(() {}); return; }
+            store.logMeasurement('custom_${label.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '_')}', v);
+            Navigator.pop(ctx);
+            pulseSnack(context, '$label saved at $v cm', icon: Icons.straighten_rounded);
+          }),
+        ]),
+      );
+    }));
+  }
+
+  void _editMeasurement(BuildContext context, String label) {
+    if (label == 'Weight') {
+      pulseSnack(context, 'Log your weight from the Weight progress screen.', icon: Icons.monitor_weight_rounded);
+      return;
+    }
+    final store = context.pulse;
+    final site = store.measurements.sites.where((s) => s.label == label).firstOrNull;
+    _selectedSite = site?.id;
+    _addMeasurement(context, presetSiteId: site?.id);
   }
 }
 
@@ -512,15 +562,24 @@ class ProgressPhotosScreen extends StatefulWidget {
 
 class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
   double _slider = 0.5;
-  String _angle = 'Front';
+  PhotoPose _pose = PhotoPose.front;
+
+  static String _fmtDate(DateTime d) =>
+      '${d.day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.month - 1]}';
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final pair = context.pulse.progressPhotos.comparisonPair(_pose);
+    final _pairLeft = pair == null ? null
+        : '${_fmtDate(pair.$1.date)}${pair.$1.weightKgAtCapture != null ? ' · ${pair.$1.weightKgAtCapture!.toStringAsFixed(1)} kg' : ''}';
+    final _pairRight = pair == null ? null
+        : '${_fmtDate(pair.$2.date)}${pair.$2.weightKgAtCapture != null ? ' · ${pair.$2.weightKgAtCapture!.toStringAsFixed(1)} kg' : ''}';
     return PulseScaffold(
       title: 'Progress Photos',
       actions: [IconButton3(icon: Icons.add_a_photo_rounded, tooltip: 'Take photo',
           onTap: () => pulseSnack(context, 'Camera opens. Photos save privately — never uploaded or shared automatically.', icon: Icons.lock_rounded))],
+      // WP3.3b: rebuilds on every store notification so new captures appear instantly.
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
         // Explicit privacy banner (§46 requirement)
         Container(
@@ -535,9 +594,9 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
           ]),
         ),
         const SizedBox(height: PulseSpacing.l),
-        Row(children: [for (final a in const ['Front', 'Side', 'Back'])
-          Expanded(child: Padding(padding: EdgeInsets.only(right: a == 'Back' ? 0 : PulseSpacing.s),
-              child: ChoiceChip(label: Text(a, style: const TextStyle(fontSize: 13.5)), selected: _angle == a, onSelected: (_) => setState(() => _angle = a))))]),
+        Row(children: [for (final a in PhotoPose.values)
+          Expanded(child: Padding(padding: EdgeInsets.only(right: a == PhotoPose.back ? 0 : PulseSpacing.s),
+              child: ChoiceChip(label: Text(photoPoseLabel(a), style: const TextStyle(fontSize: 13.5)), selected: _pose == a, onSelected: (_) => setState(() => _pose = a))))]),
         const SizedBox(height: PulseSpacing.l),
         // Comparison slider between two dated captures
         PulseCard(
@@ -551,9 +610,9 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                 ClipRect(child: FractionallySizedBox(widthFactor: 1 - _slider, alignment: Alignment.centerRight,
                     child: Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF7E938B), Color(0xFF5F7A70)]))))),
                 Positioned(left: MediaQuery.sizeOf(context).width * _slider - 40, bottom: 12,
-                    child: Text('Aug 1 · 84.5 kg', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white, shadows: const [Shadow(blurRadius: 6, color: Colors.black54)]))),
+                    child: Text(_pairLeft ?? 'No capture yet', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white, shadows: const [Shadow(blurRadius: 6, color: Colors.black54)]))),
                 Positioned(right: 12, bottom: 12,
-                    child: Text('Sep 29 · 79.8 kg', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white, shadows: const [Shadow(blurRadius: 6, color: Colors.black54)]))),
+                    child: Text(_pairRight ?? 'Add two photos to compare', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white, shadows: const [Shadow(blurRadius: 6, color: Colors.black54)]))),
                 Positioned(left: MediaQuery.sizeOf(context).width * _slider - 1.5, top: 0, bottom: 0,
                     child: Container(width: 3, color: Colors.white,
                         child: Align(alignment: Alignment.center, child: Transform.translate(offset: const Offset(-13, 0),
@@ -564,18 +623,36 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
           ]),
         ),
         const SizedBox(height: PulseSpacing.m),
-        SectionHeader(title: 'Gallery · $_angle'),
-        GridView.count(crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: PulseSpacing.s, crossAxisSpacing: PulseSpacing.s, childAspectRatio: 0.75,
-            children: [
-              for (final d in const ['Aug 1', 'Aug 15', 'Sep 1', 'Sep 15', 'Sep 29'])
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(alignment: Alignment.bottomLeft, children: [
-                    Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [const Color(0xFF9DB4AB), const Color(0xFF6E8880)], begin: Alignment.topCenter, end: Alignment.bottomCenter))),
-                    Padding(padding: const EdgeInsets.all(6), child: Text(d, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700))),
-                  ]),
-                ),
-            ]),
+        SectionHeader(title: 'Gallery · ${photoPoseLabel(_pose)}'),
+        if (context.pulse.progressPhotos.forPose(_pose).isEmpty)
+          EmptyState(
+            icon: Icons.photo_camera_rounded,
+            title: 'No ${photoPoseLabel(_pose).toLowerCase()} photos yet',
+            body: 'Take your first ${photoPoseLabel(_pose).toLowerCase()} photo — future captures make an honest side-by-side comparison.',
+            actionLabel: 'Add First Photo',
+            onAction: () => pulseSnack(context, 'Camera opens. Photos save privately — never uploaded or shared automatically.', icon: Icons.lock_rounded),
+          )
+        else
+          GridView.count(crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: PulseSpacing.s, crossAxisSpacing: PulseSpacing.s, childAspectRatio: 0.75,
+              children: [
+                for (final ph in context.pulse.progressPhotos.forPose(_pose))
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Semantics(
+                      image: true, label: '${photoPoseLabel(_pose)} progress photo, ${_fmtDate(ph.date)}',
+                      child: GestureDetector(
+                        onLongPress: () {
+                          final f = context.pulse.removeProgressPhoto(ph.id);
+                          if (f != null) pulseSnack(context, 'Photo deleted from this device.', icon: Icons.delete_rounded);
+                        },
+                        child: Stack(alignment: Alignment.bottomLeft, children: [
+                          Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [const Color(0xFF9DB4AB), const Color(0xFF6E8880)], begin: Alignment.topCenter, end: Alignment.bottomCenter))),
+                          Padding(padding: const EdgeInsets.all(6), child: Text(_fmtDate(ph.date), style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700))),
+                        ]),
+                      ),
+                    ),
+                  ),
+              ]),
         const SizedBox(height: PulseSpacing.m),
         Text('Tip: use the same lighting, angle and time of day for the most honest comparisons.',
             style: Theme.of(context).textTheme.bodySmall),

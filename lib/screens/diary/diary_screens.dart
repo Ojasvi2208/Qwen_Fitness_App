@@ -83,6 +83,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         store.track('diary_completed');
                         pulseSnack(context, 'Diary marked complete. Tomorrow is another opportunity to stay consistent.', icon: Icons.verified_rounded);
                       }),
+                  // Ad policy slot: after-diary-complete footer (free tier only;
+                  // AdBanner self-enforces entitlements — never shown to Pro).
+                  const AdBanner(slot: AdSlot.afterDiaryComplete),
                   const SizedBox(height: PulseSpacing.s),
                   const HealthDisclaimer(),
                 ],

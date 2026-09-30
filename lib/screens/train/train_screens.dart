@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import '../../data/pulse_store.dart';
+import '../../data/workout_session.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pulse_components.dart';
@@ -41,8 +42,8 @@ class TrainScreen extends StatelessWidget {
             ]),
             const SizedBox(height: PulseSpacing.m),
             PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
-              store.track('workout_started');
-              Navigator.of(context).pushNamed('/active-workout');
+              context.pulse.startWorkout('Upper Body Strength');
+              Navigator.of(context).pushNamed('/active-workout', arguments: 'Upper Body Strength');
             }),
             const SizedBox(height: PulseSpacing.s),
             Center(child: Text('Planned for 6:30 PM · you can start any time', style: Theme.of(context).textTheme.labelSmall)),
@@ -245,7 +246,7 @@ class WorkoutDetailScreen extends StatelessWidget {
         Wrap(spacing: PulseSpacing.s, children: [for (final e in w.equipment) Chip(label: Text(e, style: const TextStyle(fontSize: 14)))]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: '${w.exercises} exercises'),
-        for (var i = 0; i < PulseData.upperBodyExercises.length && i < w.exercises; i++)
+        for (var i = 0; i < w.exercises && i < PulseData.upperBodyExercises.length; i++)
           Card(
             margin: const EdgeInsets.only(bottom: PulseSpacing.s),
             child: ListTile(
@@ -259,8 +260,10 @@ class WorkoutDetailScreen extends StatelessWidget {
           ),
         const SizedBox(height: PulseSpacing.m),
         PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
-          store.track('workout_started');
-          Navigator.of(context).pushReplacementNamed('/active-workout');
+          // WP3.1: create the real session BEFORE navigating; the active
+          // screen resumes it (and re-starts defensively if none exists).
+          store.startWorkout(w.name);
+          Navigator.of(context).pushReplacementNamed('/active-workout', arguments: w.name);
         }),
         const SizedBox(height: PulseSpacing.s),
         SecondaryButton(label: 'Add to Tomorrow\'s Plan', icon: Icons.event_available_rounded,
@@ -278,35 +281,76 @@ class WorkoutDetailScreen extends StatelessWidget {
 
 // ── §35 Active Workout — sets, rest timer, navigation ──────────────
 class ActiveWorkoutScreen extends StatefulWidget {
-  const ActiveWorkoutScreen({super.key});
+  const ActiveWorkoutScreen({super.key, this.workoutName = 'Upper Body Strength'});
+  final String workoutName;
   @override
   State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
 }
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTickerProviderStateMixin {
+  /// WP3.1 — the store's session engine is the single source of truth.
+  /// UI keeps only transient input state (current reps/weight/rest).
+  PulseStore get _store => context.pulse;
+  WorkoutSession? get _session => _store.sessions.activeSession;
+  List<ExercisePlan> get _plan =>
+      WorkoutTemplates.byName(_store.sessions.activeSession?.templateName ?? widget.workoutName).plan;
+
   int _exerciseIndex = 0;
-  int _set = 2; // Set 2 of 4 per brief
-  static const _totalSets = 4;
-  final Map<int, ({int reps, double weight})> _last = {
-    0: (reps: 10, weight: 20),
-  };
   int _reps = 10;
   double _weightKg = 20;
   bool _resting = false;
   late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
   Timer? _restTimer;
   int _restLeft = 90;
-  final List<MapEntry<String, int>> _completedSets = [];
+  final Stopwatch _elapsedWatch = Stopwatch();
 
-  Duration get _elapsed => const Duration(minutes: 12) + Duration(seconds: _tick.elapsed.inSeconds.remainder(3600));
-  static final Stopwatch _tick = Stopwatch()..start();
+  int get _totalSetsForCurrent => _plan[_exerciseIndex].targetSets;
+  int get _currentSetNumber => (_session?.setsDoneFor(_exerciseIndex) ?? 0) + 1;
+
+  @override
+  void initState() {
+    super.initState();
+    // Route guard: entering directly (deep link / app restart) starts or
+    // resumes a real session so stats always come from persisted records.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_store.sessions.hasActive) {
+        _store.startWorkout(widget.workoutName);
+      }
+      _seedInputsFromHistory();
+      _elapsedWatch
+        ..reset()
+        ..start();
+    });
+  }
+
+  /// Prefill inputs from the exercise's last logged set ("Previous" hint).
+  void _seedInputsFromHistory() {
+    final prev = _session?.lastSetFor(_exerciseIndex);
+    setState(() {
+      _reps = prev?.reps ?? _plan[_exerciseIndex].targetReps ?? 10;
+      _weightKg = prev?.weightKg != null && prev!.weightKg > 0
+          ? prev.weightKg
+          : _defaultWeightFor(_exerciseIndex);
+    });
+  }
+
+  static double _defaultWeightFor(int i) => switch (i) {
+        0 => 20.0, 1 => 12.5, 2 => 22.5, 3 => 7.5, 4 => 10.0, 5 => 15.0, _ => 2.5,
+      };
 
   void _completeSet() {
     HapticFeedback.mediumImpact();
-    final ex = PulseData.upperBodyExercises[_exerciseIndex];
-    _completedSets.add(MapEntry(ex.name, _reps));
-    if (_set < _totalSets) {
-      setState(() { _set++; _resting = true; _restLeft = 90; });
+    final logged = _currentSetNumber;
+    _store.logSet(
+        exerciseIndex: _exerciseIndex,
+        setNumber: logged,
+        reps: _reps,
+        weightKg: _weightKg);
+    pulseSnack(context, 'Set $logged · ${_plan[_exerciseIndex].name}',
+        undoLabel: 'Undo', onUndo: () => _store.undoLastSet());
+    if (logged <= _totalSetsForCurrent - 1) {
+      setState(() { _resting = true; _restLeft = 90; });
       _restTimer?.cancel();
       _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
         if (!mounted) return t.cancel();
@@ -322,11 +366,30 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
   void _nextExercise() {
     _restTimer?.cancel();
     setState(() {
-      _exerciseIndex = (_exerciseIndex + 1) % PulseData.upperBodyExercises.length;
-      _set = 1;
+      _exerciseIndex = (_exerciseIndex + 1) % _plan.length;
       _resting = false;
-      _last.putIfAbsent(_exerciseIndex, () => (reps: 10, weight: 20));
+      _seedInputsFromHistory();
     });
+  }
+
+  Future<void> _endWorkout() async {
+    final s = _session;
+    if (s == null) { Navigator.of(context).pop(); return; }
+    final sets = s.totalSets;
+    final ok = await pulseConfirm(context,
+        title: sets == 0 ? 'Discard this workout?' : 'End workout early?',
+        body: sets == 0
+            ? 'No sets were completed, so there is nothing to save.'
+            : "We'll save the $sets completed ${sets == 1 ? 'set' : 'sets'} so far. Nothing is lost.",
+        confirmLabel: sets == 0 ? 'Discard' : 'End & Save');
+    if (!ok || !mounted) return;
+    if (sets == 0) {
+      _store.sessions.discardActive();
+      Navigator.of(context).pop();
+    } else {
+      _store.finishWorkout();
+      if (mounted) Navigator.of(context).pushReplacementNamed('/workout-complete');
+    }
   }
 
   @override
@@ -335,21 +398,33 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final ex = PulseData.upperBodyExercises[_exerciseIndex];
-    final prev = _last[_exerciseIndex];
+    final session = _session;
+    if (session == null) {
+      // Session finished elsewhere — calm redirect, never a crash.
+      return Scaffold(
+        appBar: AppBar(title: const Text('Workout')),
+        body: Center(
+          child: EmptyState(
+            icon: Icons.check_circle_outline_rounded,
+            title: 'This workout is already saved',
+            body: 'Find it in your workout history with all its sets intact.',
+            actionLabel: 'Back to Train',
+            onAction: () => Navigator.of(context).pop(),
+          ),
+        ),
+      );
+    }
+    final ex = _plan[_exerciseIndex];
+    final prev = session.lastSetFor(_exerciseIndex);
+    final done = session.setsDoneFor(_exerciseIndex);
+    final minutesRun = _elapsedWatch.elapsed.inMinutes;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Upper Body Strength · $_elapsed'.replaceAll('0:12', '12'), style: const TextStyle(fontSize: 16)),
+        title: Text('${session.templateName} · $minutesRun min', style: const TextStyle(fontSize: 16)),
         leading: IconButton(
             tooltip: 'End workout',
             icon: const Icon(Icons.stop_rounded),
-            onPressed: () async {
-              final ok = await pulseConfirm(context,
-                  title: 'End workout early?',
-                  body: 'We\'ll save the ${_completedSets.length} completed sets so far. Nothing is lost.',
-                  confirmLabel: 'End & Save');
-              if (ok && context.mounted) Navigator.of(context).pushReplacementNamed('/workout-complete');
-            }),
+            onPressed: _endWorkout),
         actions: [
           IconButton3(icon: Icons.more_vert_rounded, onTap: () => pulseSheet(context, builder: (ctx) => SafeArea(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -357,7 +432,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
               ListTile(leading: const Icon(Icons.swap_horiz_rounded), title: const Text('Replace Exercise'), onTap: () { Navigator.pop(ctx); pulseSnack(context, 'Replacement picker opens the exercise library.'); }),
               ListTile(leading: const Icon(Icons.info_outline_rounded), title: const Text('View Instructions'), onTap: () { Navigator.pop(ctx); Navigator.of(context).pushNamed('/exercise-instructions', arguments: ex.name); }),
               ListTile(leading: const Icon(Icons.stop_circle_outlined), title: const Text('End Workout', style: TextStyle(color: PulseColors.error)),
-                  onTap: () { Navigator.pop(ctx); Navigator.of(context).pushReplacementNamed('/workout-complete'); }),
+                  onTap: () { Navigator.pop(ctx); _endWorkout(); }),
             ]),
           ))),
         ],
@@ -367,17 +442,17 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
           padding: const EdgeInsets.all(PulseSpacing.l),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Large visible exercise
-            Text('Set $_set of $_totalSets', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13.5)),
+            Text('Set ${done + 1} of $_totalSetsForCurrent', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13.5)),
             const SizedBox(height: 2),
             Text(ex.name, style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: PulseSpacing.xs),
-            Text('${ex.muscle} · ${ex.sets}', style: Theme.of(context).textTheme.bodySmall),
+            Text('${ex.muscle} · ${ex.setsLabel}', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: PulseSpacing.l),
             if (prev != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: PulseSpacing.sm),
                 decoration: BoxDecoration(color: scheme.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(PulseRadius.m)),
-                child: Text('Previous: ${prev.reps} × ${prev.weight.toStringAsFixed(0)} kg',
+                child: Text('Previous: ${prev.reps} × ${prev.weightKg.toStringAsFixed(0)} kg',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: scheme.primary)),
               ),
             const SizedBox(height: PulseSpacing.l),
@@ -422,13 +497,16 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
                           Text('${(_restLeft ~/ 60).toString().padLeft(2, '0')}:${(_restLeft % 60).toString().padLeft(2, '0')}',
                               style: PulseTypography.metricMedium.copyWith(color: scheme.onSurface)),
                         ])),
-                        TextButton(onPressed: () => setState(() { _resting = false; _restTimer?.cancel(); }), child: const Text('Skip')),
+                        TextButton(onPressed: () => setState(() { _resting = false; _restTimer?.cancel(); }), child: const Text('Skip'))
                       ]),
                     )
                   : PulseCard(
                       key: const ValueKey('nav'),
                       child: Row(children: [
-                        Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _exerciseIndex = (_exerciseIndex - 1) % PulseData.upperBodyExercises.length),
+                        Expanded(child: OutlinedButton.icon(onPressed: () => setState(() {
+                              _exerciseIndex = (_exerciseIndex - 1 + _plan.length) % _plan.length;
+                              _seedInputsFromHistory();
+                            }),
                             icon: const Icon(Icons.arrow_back_rounded, size: 18), label: const Text('Previous'))),
                         const SizedBox(width: PulseSpacing.s),
                         Expanded(child: FilledButton.tonalIcon(onPressed: _nextExercise,
@@ -437,7 +515,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> with SingleTi
                     ),
             ),
             const SizedBox(height: PulseSpacing.l),
-            Text('Completed: ${_completedSets.map((e) => '${e.value}×').join(' ')}',
+            Text('Completed: ${session.totalSets} sets · ${session.volumeLabel} so far',
                 style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
@@ -513,10 +591,35 @@ class WorkoutCompleteScreen extends StatefulWidget {
 
 class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
   int? _rating; // 0 easy 1 just right 2 hard
+  bool _saved = false;
+
+  /// WP3.1 — stats come from the real session. If none is available
+  /// (e.g. screen opened cold), fall back to the most recent completed
+  /// session; only then to a zero-set placeholder so UI never lies with
+  /// fabricated "8,640 kg" numbers.
+  WorkoutSession? _sessionOf(PulseStore store) {
+    final active = store.sessions.activeSession;
+    if (active != null) return active;
+    return store.sessions.history.isEmpty ? null : store.sessions.history.first;
+  }
 
   @override
   Widget build(BuildContext context) {
     final store = context.pulse;
+    final s = _sessionOf(store);
+    // Finish the live session exactly once so kcal are credited only once.
+    if (s != null && s.status == SessionStatus.active && !_saved) {
+      _saved = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) store.finishWorkout(rating: _rating);
+      });
+    }
+    final minutes = s?.durationMinutes ?? 0;
+    final setsTxt = '${s?.totalSets ?? 0}';
+    final exTxt = '${s?.exercisesCompleted ?? 0}';
+    final volTxt = s?.volumeLabel ?? '0 kg';
+    final kcalTxt = '${s?.estimatedKcal ?? 0}';
+    final name = s?.templateName ?? 'Your workout';
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -533,22 +636,28 @@ class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
             ),
             const SizedBox(height: PulseSpacing.l),
             Text('Workout Complete', style: Theme.of(context).textTheme.displaySmall, textAlign: TextAlign.center),
-            Text('Upper Body Strength · Tuesday evening', style: Theme.of(context).textTheme.bodySmall),
+            Text('$name · ${_dayLabel()}', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: PulseSpacing.xl),
-            PulseCard(
-              padding: const EdgeInsets.all(PulseSpacing.l),
-              child: Row(children: [
-                _stat(context, 'Duration', '42 min'),
-                _stat(context, 'Exercises', '8'),
-                _stat(context, 'Sets', '24'),
-              ]),
-            ),
-            const SizedBox(height: PulseSpacing.s),
-            PulseCard(
-              child: Row(children: [
-                _stat(context, 'Volume', '8,640 kg'),
-                _stat(context, 'Est. Calories', '276'),
-                _stat(context, 'Avg HR', '131 bpm'),
+            // Screen-reader summary of the whole card (§70 charts need text)
+            Semantics(
+              label: '$name complete. $minutes minutes, $exTxt exercises, $setsTxt sets, volume $volTxt, estimated $kcalTxt calories.',
+              child: Column(children: [
+                PulseCard(
+                  padding: const EdgeInsets.all(PulseSpacing.l),
+                  child: Row(children: [
+                    _stat(context, 'Duration', '$minutes min'),
+                    _stat(context, 'Exercises', exTxt),
+                    _stat(context, 'Sets', setsTxt),
+                  ]),
+                ),
+                const SizedBox(height: PulseSpacing.s),
+                PulseCard(
+                  child: Row(children: [
+                    _stat(context, 'Volume', volTxt),
+                    _stat(context, 'Est. Calories', kcalTxt),
+                    _stat(context, 'Rating', _rating == null ? 'Not rated' : const ['Too Easy', 'Just Right', 'Too Hard'][_rating!]),
+                  ]),
+                ),
               ]),
             ),
             const SizedBox(height: PulseSpacing.l),
@@ -559,14 +668,16 @@ class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(left: i == 0 ? 0 : PulseSpacing.s),
-                    child: ChoiceChip(label: Text(l, style: const TextStyle(fontSize: 13.5)), selected: _rating == i, onSelected: (_) => setState(() => _rating = i)),
+                    child: ChoiceChip(label: Text(l, style: const TextStyle(fontSize: 13.5)), selected: _rating == i, onSelected: (_) => setState(() {
+                          _rating = i;
+                          // Persist rating onto the most recent saved session.
+                          context.pulse.rateLastWorkout(i);
+                        })),
                   ),
                 ),
             ]),
             const SizedBox(height: PulseSpacing.xl),
             PrimaryButton(label: 'Done', onTap: () {
-              store.track('workout_completed');
-              store.activityCaloriesBurned += 276;
               Navigator.of(context).pushNamedAndRemoveUntil('/home', (r) => false);
               pulseSnack(context, 'Workout saved', icon: Icons.check_circle_rounded);
             }),
@@ -577,6 +688,13 @@ class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
         ),
       ),
     );
+  }
+
+  String _dayLabel() {
+    final d = DateTime.now();
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final part = d.hour < 12 ? 'morning' : (d.hour < 17 ? 'afternoon' : 'evening');
+    return '${days[d.weekday - 1]} $part';
   }
 
   Widget _stat(BuildContext c, String l, String v) => Expanded(

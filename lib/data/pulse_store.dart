@@ -1,5 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
+import 'consistency_service.dart';
+import 'measurements.dart';
+import 'monetization.dart';
+import 'nutrition_service.dart';
+import 'persistence/local_backend.dart';
+import 'progress_photos.dart';
+import 'reminders.dart';
+import 'workout_session.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// PULSE APP STATE — lightweight InheritedNotifier store (no external
@@ -91,8 +101,19 @@ class WeightRecord {
 
 /// App-wide change store.
 class PulseStore extends ChangeNotifier {
+  PulseStore();
+
+  /// Construct and immediately restore user data from the local backend.
+  /// Await before first use so derived totals reflect persisted state.
+  Future<void> initLocal(LocalRepository repository) =>
+      attachPersistence(repository);
+
   /// Watch access used across screens: PulseStore.of(context).
-  static PulseStore of(BuildContext context) => PulseStoreAccess.of(context);
+  static PulseStore of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<PulseScope>();
+    assert(scope != null, 'PulseScope missing — wrap the app in PulseScope.');
+    return scope!.notifier!;
+  }
 
   // ── Sample user (§84): consistent across every screen ────────────
   final String userName = 'Alex Morgan';
@@ -100,7 +121,7 @@ class PulseStore extends ChangeNotifier {
   final int age = 32;
   final double heightCm = 178;
   final double startWeight = 84.5;
-  final double currentWeight = 79.8;
+  double currentWeight = 79.8;
   final String memberSince = 'March 2026';
 
   final Goals goals = Goals(
@@ -121,6 +142,166 @@ class PulseStore extends ChangeNotifier {
   double waterLogged = 1.7; // liters
   int workoutsCompletedToday = 1;
 
+  /// ── WP3.5 Reminders (§58/§64) ───────────────────────────────────
+  /// Models persist in the snapshot; OS scheduling lives behind the
+  /// injectable [ReminderScheduler] seam (production wires the plugin).
+  late final ReminderManager reminders = ReminderManager(
+    onChanged: () {
+      _markDirty();
+      notifyListeners();
+    },
+  );
+
+  /// ── WP3.4 Habit toggles (§40 "customize which habits are tracked") ─
+  /// Starts from the catalog defaults; persisted so a user's choices
+  /// survive restarts. Keyed by habit name.
+  final Map<String, bool> habitEnabled = {for (final h in PulseData.habits) h.name: h.on};
+
+  bool toggleHabit(String name) {
+    final v = !(habitEnabled[name] ?? true);
+    habitEnabled[name] = v;
+    _markDirty();
+    notifyListeners();
+    return v;
+  }
+
+  List<({String name, IconData icon, Color color, String progress, bool on})> get activeHabits =>
+      PulseData.habits.where((h) => habitEnabled[h.name] ?? h.on).toList(growable: false);
+
+  /// ── WP3.2 Nutrition service accessor ────────────────────────────
+  /// The single source of truth for calorie/macro figures. Screens that
+  /// need fiber or per-meal totals read this instead of recomputing.
+  DayNutrition get nutrition => NutritionService.forToday(this);
+
+  /// ── WP3.4 Consistency engine accessor ───────────────────────────
+  ConsistencyStore get consistency => ConsistencyStore(this);
+
+  /// ── WP3.1 Workout Session Engine ────────────────────────────────
+  /// Single source of truth for active + completed sessions. Every
+  /// mutation persists via autosave and notifies listeners.
+  late final WorkoutSessionManager sessions =
+      WorkoutSessionManager(onChanged: () {
+    _markDirty();
+    notifyListeners();
+  });
+
+  /// Start a workout for [templateName]; returns the live session.
+  WorkoutSession startWorkout(String templateName) {
+    track('workout_started');
+    return sessions.start(templateName);
+  }
+
+  /// Record one completed set (Active Workout screen).
+  SetRecord logSet({required int exerciseIndex, required int setNumber,
+      required int reps, required double weightKg}) =>
+      sessions.logSet(
+          exerciseIndex: exerciseIndex,
+          setNumber: setNumber,
+          reps: reps,
+          weightKg: weightKg);
+
+  /// Undo the last logged set — symmetric with logSet (§76 undo).
+  SetRecord? undoLastSet() => sessions.undoLastSet();
+
+  /// Rate the most recently completed session (Workout Complete screen).
+  void rateLastWorkout(int rating) {
+    if (sessions.history.isEmpty) return;
+    final s = sessions.history.first; // newest-first view
+    // mutate through a manager-level API so autosave fires
+    sessions.rate(s.id, rating);
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Finish (complete or end-early) the active session, credit derived
+  /// calories, bump today's workout count, and persist everything.
+  WorkoutSession? finishWorkout({int? rating}) {
+    final s = sessions.finish(rating: rating);
+    if (s == null) return null;
+    if (s.totalSets > 0) {
+      activityCaloriesBurned += s.estimatedKcal;
+      workoutsCompletedToday += 1;
+    }
+    track('workout_completed');
+    _markDirty();
+    notifyListeners();
+    return s;
+  }
+
+  /// ── WP3.3 Body Measurements + Progress Photos (§45/§46) ─────────
+  /// Metadata-only photo book — image bytes never enter the snapshot.
+  /// Seeded with Alex Morgan's sample history (§84) so the screen shows
+  /// realistic trend data on first launch; logging a value for today
+  /// upserts rather than duplicates (same semantics as the weight log).
+  MeasurementBook measurements = _seedMeasurements(MeasurementBook());
+  final ProgressPhotoBook progressPhotos = ProgressPhotoBook();
+
+  static MeasurementBook _seedMeasurements(MeasurementBook b) {
+    const seed = <(String, int, double)>[
+      ('body_fat', 6, 23.5), ('body_fat', 9, 21.4),
+      ('waist', 6, 94), ('waist', 9, 88),
+      ('chest', 6, 102), ('chest', 9, 101),
+      ('hips', 6, 103), ('hips', 9, 99),
+      ('arms', 6, 32.5), ('arms', 9, 33),
+      ('thighs', 6, 57), ('thighs', 9, 56),
+      ('neck', 6, 38), ('neck', 9, 38),
+    ];
+    for (final (id, mo, v) in seed) {
+      b.log(id, DateTime(2026, mo, 15), v);
+    }
+    return b;
+  }
+
+  /// Log (or same-day replace) a measurement. Returns false for unknown
+  /// sites or invalid values so the UI can show inline errors (§75).
+  bool logMeasurement(String siteId, double value, {DateTime? onDate}) {
+    final ok = measurements.log(siteId, onDate ?? DateTime.now(), value);
+    if (ok) {
+      track('measurement_logged');
+      _markDirty();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  /// Add a custom measurement site (§45 "Allow custom measurement").
+  /// Returns false when the label collides with an existing site.
+  bool addMeasurementSite(String label, {String unit = 'cm', bool lowerIsBetter = true}) {
+    final id = 'custom_${label.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '_')}';
+    final ok = measurements.addSite(MeasurementSite(id: id, label: label, unit: unit, lowerIsBetter: lowerIsBetter));
+    if (ok) {
+      _markDirty();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  /// Register a captured progress photo. [fileName] points into the app's
+  /// private documents directory; nothing is uploaded (§46 privacy).
+  void addProgressPhoto(PhotoPose pose, String fileName, {DateTime? onDate}) {
+    progressPhotos.add(ProgressPhoto(
+      id: 'ph_${DateTime.now().microsecondsSinceEpoch}',
+      date: onDate ?? DateTime.now(),
+      pose: pose,
+      fileName: fileName,
+      weightKgAtCapture: currentWeightLive ?? currentWeight,
+    ));
+    track('progress_photo_added');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Remove a photo record; returns the file name so the caller can
+  /// delete the image from disk atomically (§60 erasure).
+  String? removeProgressPhoto(String id) {
+    final f = progressPhotos.remove(id);
+    if (f != null) {
+      _markDirty();
+      notifyListeners();
+    }
+    return f;
+  }
+
   /// Weigh-in history (local-first). Seeded with the sample trend so
   /// charts have data on first launch; new entries are appended live.
   final List<WeightRecord> weights = [
@@ -134,7 +315,58 @@ class PulseStore extends ChangeNotifier {
     WeightRecord(DateTime(2026, 9, 15), 80.1),
     WeightRecord(DateTime(2026, 9, 29), 79.8),
   ];
-  bool premium = false;
+  /// ── PHASE 4: subscription state (single source of truth) ──────
+  /// Legacy `premium` reads now derive from the entitlement engine so
+  /// trial expiry, paid plans and ad policy can never disagree with UI.
+  final SubscriptionState subscription = SubscriptionState();
+  late final Entitlements entitlements = Entitlements(() => subscription);
+
+  /// Back-compat getter used across screens (§61/§87 premium states).
+  bool get premium => entitlements.isPro;
+  bool get adsAllowed => entitlements.shouldShowAds;
+  PulsePlan get plan => entitlements.effectivePlan();
+  String? get trialBanner => entitlements.trialBannerText();
+
+  /// Start the one-shot 3-day Pro trial via the purchase gateway seam.
+  Future<bool> startTrial({PurchaseGateway? gateway}) async {
+    if (subscription.trialUsed || entitlements.isPro) return false;
+    final gw = gateway ?? StubPurchaseGateway();
+    if (!await gw.purchase(PulsePricing.yearly)) return false;
+    if (!entitlements.beginTrial()) return false;
+    track('trial_started');
+    _markDirty();
+    notifyListeners();
+    return true;
+  }
+
+  /// Complete a paid purchase (monthly/yearly price from PulsePricing).
+  Future<bool> purchasePro(PulsePrice price, {PurchaseGateway? gateway}) async {
+    final gw = gateway ?? StubPurchaseGateway();
+    if (!await gw.purchase(price)) return false;
+    entitlements.activatePaid(price);
+    track('subscription_purchased', {'plan': price.cadence});
+    _markDirty();
+    notifyListeners();
+    return true;
+  }
+
+  /// Cancel → free immediately (data is never deleted — §60 promise).
+  void cancelSubscription() {
+    entitlements.revertToFree();
+    track('subscription_cancelled');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Called on app resume: settles an expired trial into persisted free.
+  void settleSubscription() {
+    if (entitlements.settleExpired()) {
+      track('trial_expired');
+      _markDirty();
+      notifyListeners();
+    }
+  }
+
   bool offlineMode = false;
   String unitsMass = 'kg'; // kg | lb
   String unitsLength = 'cm'; // cm | ft+in
@@ -147,6 +379,10 @@ class PulseStore extends ChangeNotifier {
     ('Sep 29', 79.8),
   ];
   static const weeklyCalories = <int>[2120, 1980, 2065, 2210, 2040, 1995, 2145];
+
+  /// Fiber goal in grams — general adult guidance (displayed as an
+  /// informational target; PULSE does not provide medical advice).
+  static const double fiberGoal = 28;
 
   // ── Derived totals ────────────────────────────────────────────────
   double get foodKcal => diary.fold(0.0, (s, e) => s + e.kcal);
@@ -172,36 +408,49 @@ class PulseStore extends ChangeNotifier {
     diary.add(DiaryEntry(id: DateTime.now().microsecondsSinceEpoch.toString(),
         food: f, servings: servings, meal: meal));
     track('food_logged');
+    _markDirty();
     notifyListeners();
   }
 
   void removeEntry(String id) {
     diary.removeWhere((e) => e.id == id);
+    _markDirty();
     notifyListeners();
   }
 
   void addWater(double liters) {
     waterLogged = (waterLogged + liters).clamp(0.0, 10.0);
     track('water_logged');
+    _markDirty();
     notifyListeners();
   }
 
   void logWeight(double kg, {DateTime? date}) {
     final now = date ?? DateTime.now();
+    // Day-granular upsert: re-logging a day replaces that day's record
+    // (seed rows included) instead of duplicating it.
     weights.removeWhere((w) =>
         w.date.year == now.year && w.date.month == now.month && w.date.day == now.day);
     weights.add(WeightRecord(now, kg));
     weights.sort((a, b) => a.date.compareTo(b.date));
     currentWeightLive = kg;
+    currentWeight = kg; // headline figure stays in sync with latest entry
     track('weight_logged');
+    _markDirty();
     notifyListeners();
   }
 
   void deleteWeight(DateTime date) {
     weights.removeWhere((w) =>
         w.date.year == date.year && w.date.month == date.month && w.date.day == date.day);
-    if (weights.isNotEmpty) currentWeightLive = weights.last.kg;
+    if (weights.isNotEmpty) {
+      currentWeightLive = weights.last.kg;
+      currentWeight = weights.last.kg;
+    } else {
+      currentWeightLive = null; // fall back to profile default
+    }
     track('weight_deleted');
+    _markDirty();
     notifyListeners();
   }
 
@@ -224,17 +473,26 @@ class PulseStore extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   bool analyticsEnabled = true;
 
-  void setHighContrast(bool v) { highContrast = v; track('accessibility_changed'); notifyListeners(); }
-  void setLargeText(bool v) { largeText = v; notifyListeners(); }
-  void setReduceMotion(bool v) { reduceMotion = v; notifyListeners(); }
-  void setThemeMode(ThemeMode m) { themeMode = m; notifyListeners(); }
-  void setAnalytics(bool v) { analyticsEnabled = v; notifyListeners(); }
+  void setHighContrast(bool v) { highContrast = v; track('accessibility_changed'); _markDirty();
+    notifyListeners(); }
+  void setLargeText(bool v) { largeText = v; _markDirty();
+    notifyListeners(); }
+  void setReduceMotion(bool v) { reduceMotion = v; _markDirty();
+    notifyListeners(); }
+  void setThemeMode(ThemeMode m) { themeMode = m; _markDirty();
+    notifyListeners(); }
+  void setAnalytics(bool v) { analyticsEnabled = v; _markDirty();
+    notifyListeners(); }
 
   // ── Units (§59) ──────────────────────────────────────────────────
-  void setUnitsWeight(String u) { unitsMass = u; notifyListeners(); }
-  void setUnitsHeight(String u) { unitsLength = u; notifyListeners(); }
-  void setUnitsVolume(String u) { unitsVolume = u; notifyListeners(); }
-  void setUnitsDistance(String u) { unitsDistance = u; notifyListeners(); }
+  void setUnitsWeight(String u) { unitsMass = u; _markDirty();
+    notifyListeners(); }
+  void setUnitsHeight(String u) { unitsLength = u; _markDirty();
+    notifyListeners(); }
+  void setUnitsVolume(String u) { unitsVolume = u; _markDirty();
+    notifyListeners(); }
+  void setUnitsDistance(String u) { unitsDistance = u; _markDirty();
+    notifyListeners(); }
   String get unitsWeight => unitsMass;
   String get unitsHeight => unitsLength;
 
@@ -245,30 +503,284 @@ class PulseStore extends ChangeNotifier {
     if (calorieGoal != null) goals.calorieGoal = calorieGoal;
     if (proteinGoal != null) goals.proteinGoal = proteinGoal;
     track('goal_updated');
+    _markDirty();
     notifyListeners();
   }
 
   void updateGoals(void Function(Goals g) edit) {
     edit(goals);
     track('goal_updated');
+    _markDirty();
     notifyListeners();
   }
 
   void togglePremium() {
-    premium = !premium;
-    if (premium) track('trial_started');
-    notifyListeners();
+    // Dev/QA shortcut only — production paths use startTrial/purchasePro.
+    if (subscription.plan.isPro) {
+      cancelSubscription();
+    } else {
+      entitlements.beginTrial();
+      track('trial_started');
+      _markDirty();
+      notifyListeners();
+    }
   }
 
   void setOffline(bool v) {
     offlineMode = v;
+    _markDirty();
     notifyListeners();
   }
 
   /// Analytics seam — behavior events only, never raw health values.
+  /// Tests (and a future real SDK) can attach a sink to observe events.
+  void Function(String event)? analyticsSink;
   void track(String event, [Map<String, String>? props]) {
+    analyticsSink?.call(event);
     debugPrint('📊 pulse_analytics → $event ${props ?? ''}');
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  // PHASE 2 — LOCAL PERSISTENCE (local-first, no external DB)
+  //
+  // Snapshot = JSON of everything the user created/changed: diary,
+  // water, steps, activity kcal, weight history, goals, units,
+  // appearance/accessibility settings and premium flag. Static sample
+  // content (food catalog, workout library) is NOT persisted — it is
+  // app data, not user data. Derived fields (currentWeightLive) are
+  // recomputed on hydrate so state can never drift from source records.
+  // ══════════════════════════════════════════════════════════════════
+
+  LocalRepository? _repository;
+  AutosaveCoordinator? _autosave;
+  bool get persistenceEnabled => _repository != null;
+  bool _hydratedFromDisk = false;
+  bool get hydratedFromDisk => _hydratedFromDisk;
+
+  /// Wire the local repository and restore any previously saved state.
+  /// Safe to call more than once; awaits all pending writes first.
+  Future<void> attachPersistence(LocalRepository repository,
+      {ReminderScheduler? reminderScheduler}) async {
+    await flushPendingSave();
+    if (reminderScheduler != null) reminders.attachScheduler(reminderScheduler);
+    _repository = repository;
+    await repository.init();
+    final snapshot = repository.readSnapshot();
+    try {
+      _hydrate(await snapshot);
+    } catch (_) {
+      // Defensive: a malformed-but-decodable snapshot must never brick
+      // the app. Fall back to defaults and let the next save overwrite.
+    }
+    _autosave = AutosaveCoordinator(
+      repository: repository,
+      buildSnapshot: toSnapshot,
+    );
+  }
+
+  void _hydrate(Map<String, dynamic>? s) {
+    if (s == null) return;
+    _hydratedFromDisk = true;
+
+    final g = s['goals'];
+    if (g is Map) {
+      goals.calorieGoal = (g['calorie'] as num?)?.toDouble() ?? goals.calorieGoal;
+      goals.proteinGoal = (g['protein'] as num?)?.toDouble() ?? goals.proteinGoal;
+      goals.carbGoal = (g['carbs'] as num?)?.toDouble() ?? goals.carbGoal;
+      goals.fatGoal = (g['fat'] as num?)?.toDouble() ?? goals.fatGoal;
+      goals.waterGoalLiters = (g['waterGoal'] as num?)?.toDouble() ?? goals.waterGoalLiters;
+      goals.stepGoal = (g['steps'] as num?)?.toInt() ?? goals.stepGoal;
+      goals.targetWeightKg = (g['targetWeight'] as num?)?.toDouble() ?? goals.targetWeightKg;
+      goals.workoutsPerWeek = (g['workoutsPerWeek'] as num?)?.toInt() ?? goals.workoutsPerWeek;
+    }
+
+    final entries = s['diary'];
+    if (entries is List) {
+      diary.clear();
+      for (final e in entries.whereType<Map>()) {
+        final foodId = e['foodId'];
+        if (foodId is! String) continue;
+        FoodItem food;
+        try {
+          food = PulseData.foodById(foodId);
+        } catch (_) {
+          continue; // unknown catalog id → skip entry, keep rest intact
+        }
+        diary.add(DiaryEntry(
+          id: e['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
+          food: food,
+          servings: (e['servings'] as num?)?.toDouble() ?? 1,
+          meal: MealType.values[(e['meal'] as num?)?.toInt() ?? 0],
+        ));
+      }
+    }
+
+    final w = s['weights'];
+    if (w is List && w.isNotEmpty) {
+      weights.clear();
+      for (final r in w.whereType<Map>()) {
+        final d = DateTime.tryParse('${r['date']}');
+        final kg = (r['kg'] as num?)?.toDouble();
+        if (d != null && kg != null) weights.add(WeightRecord(d, kg));
+      }
+      weights.sort((a, b) => a.date.compareTo(b.date));
+      currentWeightLive = weights.isEmpty ? null : weights.last.kg;
+    }
+
+    waterLogged = (s['water'] as num?)?.toDouble() ?? waterLogged;
+    stepsToday = (s['steps'] as num?)?.toDouble() ?? stepsToday;
+    activityCaloriesBurned =
+        (s['activityKcal'] as num?)?.toDouble() ?? activityCaloriesBurned;
+    workoutsCompletedToday =
+        (s['workoutsToday'] as num?)?.toInt() ?? workoutsCompletedToday;
+    // PHASE 4: hydrate full subscription state; legacy v1/v2 snapshots
+    // stored only a bool → map true onto an active yearly plan.
+    if (s['subscription'] is Map) {
+      final loaded = SubscriptionState.fromJson((s['subscription'] as Map).cast<String, dynamic>());
+      subscription.plan = loaded.plan;
+      subscription.trialStartedAt = loaded.trialStartedAt;
+      subscription.trialUsed = loaded.trialUsed;
+      subscription.periodStart = loaded.periodStart;
+      subscription.periodCadence = loaded.periodCadence;
+    } else if (s['premium'] == true) {
+      entitlements.activatePaid(PulsePricing.yearly);
+    }
+    settleSubscription();
+    offlineMode = s['offline'] as bool? ?? offlineMode;
+
+    if (s['units'] is Map) {
+      final u = s['units'] as Map;
+      unitsMass = u['mass'] as String? ?? unitsMass;
+      unitsLength = u['length'] as String? ?? unitsLength;
+      unitsVolume = u['volume'] as String? ?? unitsVolume;
+      unitsDistance = u['distance'] as String? ?? unitsDistance;
+    }
+    if (s['settings'] is Map) {
+      final st = s['settings'] as Map;
+      highContrast = st['highContrast'] as bool? ?? highContrast;
+      largeText = st['largeText'] as bool? ?? largeText;
+      reduceMotion = st['reduceMotion'] as bool? ?? reduceMotion;
+      analyticsEnabled = st['analytics'] as bool? ?? analyticsEnabled;
+      themeMode = switch (st['theme'] as String?) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => themeMode,
+      };
+    }
+    // schema v2 block — absent in v1 snapshots → empty history (safe).
+    sessions.hydrate(s['workouts'] is Map
+        ? (s['workouts'] as Map).cast<String, dynamic>()
+        : null);
+    // schema v3 block. Absent in v1/v2 snapshots → keep seeded sample
+    // history (§84). Present but empty (post-"Delete My Data") → start
+    // from a clean book so erased data never resurrects on restart.
+    if (s['measurements'] is Map) {
+      measurements = MeasurementBook();
+      measurements.hydrate((s['measurements'] as Map).cast<String, dynamic>());
+    }
+    if (s['photos'] is Map) {
+      progressPhotos.hydrate((s['photos'] as Map).cast<String, dynamic>());
+    }
+    // schema v4 block — reminders + habit toggles. Absent in older
+    // snapshots → keep defaults (safe additive migration).
+    if (s['reminders'] is Map) {
+      reminders.hydrate((s['reminders'] as Map).cast<String, dynamic>());
+    }
+    if (s['habits'] is Map) {
+      for (final e in (s['habits'] as Map).entries) {
+        if (e.key is String && e.value is bool) habitEnabled[e.key as String] = e.value as bool;
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Serializable snapshot of all *user* state (see block comment).
+  Map<String, dynamic> toSnapshot() => {
+        'schemaVersion': kPulseSchemaVersion,
+        'goals': {
+          'calorie': goals.calorieGoal, 'protein': goals.proteinGoal,
+          'carbs': goals.carbGoal, 'fat': goals.fatGoal,
+          'waterGoal': goals.waterGoalLiters, 'steps': goals.stepGoal,
+          'targetWeight': goals.targetWeightKg,
+          'workoutsPerWeek': goals.workoutsPerWeek,
+        },
+        'diary': [
+          for (final e in diary)
+            {'id': e.id, 'foodId': e.food.id, 'servings': e.servings, 'meal': e.meal.index},
+        ],
+        'weights': [
+          for (final r in weights) {'date': r.date.toIso8601String(), 'kg': r.kg},
+        ],
+        'water': waterLogged,
+        'steps': stepsToday,
+        'activityKcal': activityCaloriesBurned,
+        'workoutsToday': workoutsCompletedToday,
+        'workouts': sessions.toJson(),
+        'measurements': measurements.toJson(),
+        'photos': progressPhotos.toJson(),
+        'reminders': reminders.toJson(),
+        'habits': {...habitEnabled},
+        'premium': premium, // legacy mirror for v1/v2 readers
+        'subscription': subscription.toJson(),
+        'offline': offlineMode,
+        'units': {
+          'mass': unitsMass, 'length': unitsLength,
+          'volume': unitsVolume, 'distance': unitsDistance,
+        },
+        'settings': {
+          'highContrast': highContrast, 'largeText': largeText,
+          'reduceMotion': reduceMotion, 'analytics': analyticsEnabled,
+          'theme': themeMode.name,
+        },
+      };
+
+  /// Called by every mutation path — debounced disk write.
+  void _markDirty() => _autosave?.request();
+
+  /// Force completion of pending saves (app lifecycle `paused`/`detached`,
+  /// or before tests assert on-disk state). No-op without persistence.
+  Future<void> flushPendingSave() => _autosave?.flush() ?? Future.value();
+
+  /// Privacy Center "Delete My Data" (§60): wipes memory + disk atomically.
+  Future<void> deleteAllLocalData() async {
+    diary.clear();
+    weights.clear();
+    waterLogged = 0;
+    stepsToday = 0;
+    activityCaloriesBurned = 0;
+    workoutsCompletedToday = 0;
+    currentWeightLive = null;
+    sessions.discardActive(); // active session lives in memory + disk — wipe both
+    measurements = MeasurementBook(); // §60: seeded sample history erased too
+    progressPhotos.eraseAll();
+    reminders.eraseAll();
+    // §60/§97: entitlement state is account data — erased with everything
+    // else. (Store receipt restoration remains the recovery path.)
+    entitlements.revertToFree();
+    subscription.trialStartedAt = null;
+    subscription.trialUsed = false;
+    habitEnabled.updateAll((k, v) => PulseData.habits.firstWhere((h) => h.name == k).on);
+    _hydratedFromDisk = false;
+    final repo = _repository;
+    if (repo != null) {
+      _autosave?.dispose();
+      _autosave = null;
+      await repo.clearAll();
+      _autosave = AutosaveCoordinator(
+        repository: repo,
+        buildSnapshot: toSnapshot,
+      );
+    }
+    // clearAll removed the snapshot; stop the just-recreated coordinator
+    // from immediately rewriting a (now-empty-but-seeded) snapshot.
+    _autosave?.cancelPending();
+    track('data_deleted');
+    notifyListeners();
+  }
+
+  /// Export bundle for Privacy Center "Download My Data" (§60).
+  String exportUserDataJson() =>
+      const JsonEncoder.withIndent('  ').convert(toSnapshot());
 }
 
 /// ═══════════════════════════════════════════════════════════════════
@@ -414,11 +926,7 @@ class PulseScope extends InheritedNotifier<PulseStore> {
       : super(notifier: store);
 }
 
-extension PulseStoreAccess on BuildContext {
+extension PulseStoreWatch on BuildContext {
   /// Watch access — rebuilds dependents when the store notifies.
-  static PulseStore of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<PulseScope>();
-    assert(scope != null, 'PulseScope missing — wrap MyApp in PulseScope.');
-    return scope!.notifier!;
-  }
+  PulseStore get pulseWatch => PulseStore.of(this);
 }

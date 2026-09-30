@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../data/monetization.dart';
 import '../data/pulse_store.dart';
 import '../theme/tokens.dart';
 import '../widgets/pulse_components.dart';
@@ -200,6 +201,91 @@ bool ensurePremium(BuildContext context, String featureName) {
   context.pulse.track('paywall_viewed', {'feature': featureName});
   pulseSheet(context, tall: true, builder: (_) => PaywallSheet(featureName: featureName));
   return false;
+}
+
+/// ═════════ PHASE 4 — AD SLOT + TRIAL BANNER WIDGETS ═════════
+/// Ad policy (§61/§62): ads appear ONLY for free users, ONLY in the
+/// three approved footer slots, NEVER inside camera/scanner surfaces or
+/// mid-logging flows, and are always labelled "Advertisement". When a
+/// real SDK is wired, [AdBanner] renders its view instead of the honest
+/// placeholder; layout height stays stable so content never jumps.
+class AdBanner extends StatelessWidget {
+  const AdBanner({super.key, this.slot = AdSlot.homeFooter});
+  final AdSlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = PulseStore.of(context);
+    // Entitlement check lives HERE, not at call sites — impossible to
+    // forget hiding ads for Pro users.
+    if (!store.adsAllowed || !AdPolicy.allowedSlots.contains(slot)) {
+      return const SizedBox.shrink();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: PulseSpacing.s),
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(PulseRadius.m),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Stack(children: [
+          Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.smart_display_outlined, size: 22, color: scheme.onSurface.withOpacity(0.35)),
+              const SizedBox(height: 4),
+              Text('Your ad could be here', style: TextStyle(fontSize: 12, color: scheme.onSurface.withOpacity(0.4))),
+            ]),
+          ),
+          Positioned(
+            top: 6, left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: scheme.onSurface.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text('Advertisement',
+                  semanticsLabel: 'Advertisement',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.4,
+                      color: scheme.onSurface.withOpacity(0.55))),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Honest trial-status banner shown on Today while a Pro trial is active.
+/// No fake countdowns — text derived from the persisted clock (§62).
+class TrialStatusBanner extends StatelessWidget {
+  const TrialStatusBanner({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final store = PulseStore.of(context);
+    final text = store.trialBanner;
+    if (text == null) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(PulseSpacing.m, PulseSpacing.s, PulseSpacing.m, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: PulseSpacing.sm),
+        decoration: BoxDecoration(
+          color: scheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(PulseRadius.m),
+          border: Border.all(color: scheme.primary.withOpacity(0.25)),
+        ),
+        child: Row(children: [
+          Icon(Icons.workspace_premium_rounded, size: 18, color: scheme.primary),
+          const SizedBox(width: PulseSpacing.sm),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: scheme.primary))),
+        ]),
+      ),
+    );
+  }
 }
 
 /// Compact avatar used in headers/profile.
