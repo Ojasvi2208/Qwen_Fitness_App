@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'consistency_service.dart';
 import 'measurements.dart';
+import 'monetization.dart';
 import 'nutrition_service.dart';
 import 'persistence/local_backend.dart';
 import 'progress_photos.dart';
@@ -236,7 +237,7 @@ class PulseStore extends ChangeNotifier {
   final ProgressPhotoBook progressPhotos = ProgressPhotoBook();
 
   static MeasurementBook _seedMeasurements(MeasurementBook b) {
-    const seed = <(String, int, int, double)>[
+    const seed = <(String, int, double)>[
       ('body_fat', 6, 23.5), ('body_fat', 9, 21.4),
       ('waist', 6, 94), ('waist', 9, 88),
       ('chest', 6, 102), ('chest', 9, 101),
@@ -314,7 +315,58 @@ class PulseStore extends ChangeNotifier {
     WeightRecord(DateTime(2026, 9, 15), 80.1),
     WeightRecord(DateTime(2026, 9, 29), 79.8),
   ];
-  bool premium = false;
+  /// ── PHASE 4: subscription state (single source of truth) ──────
+  /// Legacy `premium` reads now derive from the entitlement engine so
+  /// trial expiry, paid plans and ad policy can never disagree with UI.
+  final SubscriptionState subscription = SubscriptionState();
+  late final Entitlements entitlements = Entitlements(() => subscription);
+
+  /// Back-compat getter used across screens (§61/§87 premium states).
+  bool get premium => entitlements.isPro;
+  bool get adsAllowed => entitlements.shouldShowAds;
+  PulsePlan get plan => entitlements.effectivePlan();
+  String? get trialBanner => entitlements.trialBannerText();
+
+  /// Start the one-shot 3-day Pro trial via the purchase gateway seam.
+  Future<bool> startTrial({PurchaseGateway? gateway}) async {
+    if (subscription.trialUsed || entitlements.isPro) return false;
+    final gw = gateway ?? StubPurchaseGateway();
+    if (!await gw.purchase(PulsePricing.yearly)) return false;
+    if (!entitlements.beginTrial()) return false;
+    track('trial_started');
+    _markDirty();
+    notifyListeners();
+    return true;
+  }
+
+  /// Complete a paid purchase (monthly/yearly price from PulsePricing).
+  Future<bool> purchasePro(PulsePrice price, {PurchaseGateway? gateway}) async {
+    final gw = gateway ?? StubPurchaseGateway();
+    if (!await gw.purchase(price)) return false;
+    entitlements.activatePaid(price);
+    track('subscription_purchased', {'plan': price.cadence});
+    _markDirty();
+    notifyListeners();
+    return true;
+  }
+
+  /// Cancel → free immediately (data is never deleted — §60 promise).
+  void cancelSubscription() {
+    entitlements.revertToFree();
+    track('subscription_cancelled');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// Called on app resume: settles an expired trial into persisted free.
+  void settleSubscription() {
+    if (entitlements.settleExpired()) {
+      track('trial_expired');
+      _markDirty();
+      notifyListeners();
+    }
+  }
+
   bool offlineMode = false;
   String unitsMass = 'kg'; // kg | lb
   String unitsLength = 'cm'; // cm | ft+in
@@ -463,10 +515,15 @@ class PulseStore extends ChangeNotifier {
   }
 
   void togglePremium() {
-    premium = !premium;
-    if (premium) track('trial_started');
-    _markDirty();
-    notifyListeners();
+    // Dev/QA shortcut only — production paths use startTrial/purchasePro.
+    if (subscription.plan.isPro) {
+      cancelSubscription();
+    } else {
+      entitlements.beginTrial();
+      track('trial_started');
+      _markDirty();
+      notifyListeners();
+    }
   }
 
   void setOffline(bool v) {
@@ -576,7 +633,19 @@ class PulseStore extends ChangeNotifier {
         (s['activityKcal'] as num?)?.toDouble() ?? activityCaloriesBurned;
     workoutsCompletedToday =
         (s['workoutsToday'] as num?)?.toInt() ?? workoutsCompletedToday;
-    premium = s['premium'] as bool? ?? premium;
+    // PHASE 4: hydrate full subscription state; legacy v1/v2 snapshots
+    // stored only a bool → map true onto an active yearly plan.
+    if (s['subscription'] is Map) {
+      final loaded = SubscriptionState.fromJson((s['subscription'] as Map).cast<String, dynamic>());
+      subscription.plan = loaded.plan;
+      subscription.trialStartedAt = loaded.trialStartedAt;
+      subscription.trialUsed = loaded.trialUsed;
+      subscription.periodStart = loaded.periodStart;
+      subscription.periodCadence = loaded.periodCadence;
+    } else if (s['premium'] == true) {
+      entitlements.activatePaid(PulsePricing.yearly);
+    }
+    settleSubscription();
     offlineMode = s['offline'] as bool? ?? offlineMode;
 
     if (s['units'] is Map) {
@@ -651,7 +720,8 @@ class PulseStore extends ChangeNotifier {
         'photos': progressPhotos.toJson(),
         'reminders': reminders.toJson(),
         'habits': {...habitEnabled},
-        'premium': premium,
+        'premium': premium, // legacy mirror for v1/v2 readers
+        'subscription': subscription.toJson(),
         'offline': offlineMode,
         'units': {
           'mass': unitsMass, 'length': unitsLength,
@@ -684,6 +754,11 @@ class PulseStore extends ChangeNotifier {
     measurements = MeasurementBook(); // §60: seeded sample history erased too
     progressPhotos.eraseAll();
     reminders.eraseAll();
+    // §60/§97: entitlement state is account data — erased with everything
+    // else. (Store receipt restoration remains the recovery path.)
+    entitlements.revertToFree();
+    subscription.trialStartedAt = null;
+    subscription.trialUsed = false;
     habitEnabled.updateAll((k, v) => PulseData.habits.firstWhere((h) => h.name == k).on);
     _hydratedFromDisk = false;
     final repo = _repository;

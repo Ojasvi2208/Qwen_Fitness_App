@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import '../../data/monetization.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -43,7 +44,9 @@ class _TodayScreenState extends State<TodayScreen> {
           children: [
             _greeting(context, store),
             if (store.offlineMode) OfflineBanner(onRetry: () => store.setOffline(false)),
+            const TrialStatusBanner(),
             for (final m in modules) ..._module(context, store, m),
+            const AdBanner(slot: AdSlot.homeFooter), // free tier only (§61)
             const HealthDisclaimer(),
           ],
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/monetization.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -59,13 +60,13 @@ class _PaywallSheetState extends State<PaywallSheet> {
               style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: PulseSpacing.xl),
           // Plan toggle — honest pricing, no countdown timers.
-          PulseSegmented(options: const ['Monthly', 'Yearly · save 40%'], index: _plan, onChanged: (i) => setState(() => _plan = i)),
+          PulseSegmented(options: const ['Monthly', 'Yearly · save 50%'], index: _plan, onChanged: (i) => setState(() => _plan = i)),
           const SizedBox(height: PulseSpacing.m),
           AnimatedSwitcher(
             duration: PulseDuration.fast,
             child: _plan == 0
-                ? _priceCard(price: '\$9.99 / month', note: 'Cancel anytime')
-                : _priceCard(price: '\$59.99 / year', note: '≈ \$4.99/month · Cancel anytime'),
+                ? _priceCard(price: '${PulsePricing.money(PulsePricing.monthly.usd)} / month', note: 'Cancel anytime')
+                : _priceCard(price: '${PulsePricing.money(PulsePricing.yearly.usd)} / year', note: '≈ \$4.99/month · Cancel anytime'),
           ),
           const SizedBox(height: PulseSpacing.l),
           for (final b in _benefits)
@@ -85,11 +86,15 @@ class _PaywallSheetState extends State<PaywallSheet> {
           PrimaryButton(
               label: 'Start Free Trial',
               icon: Icons.rocket_launch_rounded,
-              onTap: () {
-                store.togglePremium();
-                store.track('trial_started');
+              onTap: () async {
+                final started = await store.startTrial();
+                if (!context.mounted) return;
                 Navigator.pop(context);
-                pulseSnack(context, 'PULSE Pro unlocked — 14-day trial, we\'ll remind you before it ends.', icon: Icons.verified_rounded);
+                pulseSnack(context,
+                    started
+                        ? 'PULSE Pro unlocked — ${PulsePricing.trialDays}-day free trial, we\'ll remind you before it ends.'
+                        : 'Trial unavailable on this account. You can subscribe instead.',
+                    icon: started ? Icons.verified_rounded : Icons.info_outline_rounded);
               }),
           const SizedBox(height: PulseSpacing.s),
           Center(
@@ -138,8 +143,8 @@ class SubscriptionScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 2),
             Text(store.premium
-                ? 'Trial ends Oct 13, 2026 · Renews at \$59.99/year\nManage or cancel anytime below.'
-                : 'Core logging, diary, progress and workouts are free forever.',
+                ? '${store.plan.label} · ${PulsePricing.trialDays}-day trial policy applies\nManage or cancel anytime below.'
+                : 'Core logging, diary, progress and workouts are free forever. Ads keep the free plan sustainable.',
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: PulseSpacing.m),
             if (!store.premium)
@@ -174,11 +179,11 @@ class SubscriptionScreen extends StatelessWidget {
           TertiaryButton(label: 'Cancel plan', onTap: () async {
             final ok = await pulseConfirm(context,
                 title: 'Cancel PULSE Pro?',
-                body: 'You keep Pro until Oct 13, 2026, then move back to the free plan. Your logs and history are never deleted.',
+                body: 'You can move back to the free plan at any time. Your logs and history are never deleted.',
                 confirmLabel: 'Cancel subscription', destructive: true);
             if (ok && context.mounted) {
-              store.togglePremium();
-              pulseSnack(context, 'Subscription will end Oct 13, 2026. Your data stays safe.');
+              store.cancelSubscription();
+              pulseSnack(context, 'You\'re on the free plan now. Your data stays safe.');
             }
           }),
         ],

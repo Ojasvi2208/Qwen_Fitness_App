@@ -227,7 +227,7 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
   return MaterialPageRoute(builder: (_) => page, settings: settings);
 }
 
-Widget fadeTransition(BuildContext _, Animation anim, Animation __, Widget child) =>
+Widget fadeTransition(BuildContext _, Animation<double> anim, Animation __, Widget child) =>
     FadeTransition(opacity: anim, child: child);
 
 class _UnknownRouteScreen extends StatelessWidget {

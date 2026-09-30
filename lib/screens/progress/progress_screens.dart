@@ -452,7 +452,6 @@ class _MeasurementsScreenState extends State<MeasurementsScreen> {
         for (final r in rows)
           Card(
             child: ListTile(
-              semanticsLabel: '${r.$2}. ${r.$1} latest measurement.',
               leading: CircleAvatar(radius: 17, backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   child: Icon(r.$1 == 'Weight' ? Icons.monitor_weight_rounded : Icons.straighten_rounded, size: 17, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
               title: Text(r.$2, style: PulseTypography.metricSmall.copyWith(color: Theme.of(context).colorScheme.onSurface, fontSize: 17)),
@@ -485,7 +484,7 @@ class _MeasurementsScreenState extends State<MeasurementsScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SheetHeader(title: 'Log measurement', subtitle: 'Adds today’s entry — history is kept.'),
           DropdownButtonFormField<String>(
-            initialValue: siteId,
+            value: siteId,
             items: [for (final id in siteIds)
               DropdownMenuItem(value: id, child: Text(store.measurements.sites.firstWhere((s) => s.id == id).label))],
             onChanged: (v) { if (v != null) { siteId = v; set(() {}); } },

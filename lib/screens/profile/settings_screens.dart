@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/monetization.dart';
 import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
@@ -71,6 +72,7 @@ class ProfileScreen extends StatelessWidget {
                   : _appearanceSheet(context, store),
             ),
           ),
+        const AdBanner(slot: AdSlot.homeFooter), // free tier only — Pro removes ads
         const SizedBox(height: PulseSpacing.m),
         OutlinedButton.icon(onPressed: () async {
           final ok = await pulseConfirm(context,
