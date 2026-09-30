@@ -45,8 +45,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('WP3.2 NutritionService', () {
-    test('calorie equation matches §17 numbers for seeded day', () {
+    test('calorie equation matches §17 for a logged day', () {
       final s = PulseStore();
+      s.updateGoals((g) => g.calorieGoal = 2050);
+      s.addFood(PulseData.foodById('f1'), 1, MealType.breakfast); // 118
+      s.addFood(PulseData.foodById('f3'), 1.2, MealType.lunch); // 297.6
+      s.addFood(PulseData.foodById('f4'), 1, MealType.lunch); // 216
+      s.addFood(PulseData.foodById('f6'), 1, MealType.dinner); // 280
+      s.addFood(PulseData.foodById('f18'), 2, MealType.lunch); // 268
+      s.addFood(PulseData.foodById('f10'), 1, MealType.lunch); // 160
+      s.activityCaloriesBurned = 310;
       final n = NutritionService.forToday(s);
       expect(n.goal, 2050);
       expect(n.food, closeTo(1340, 1));
@@ -55,11 +63,18 @@ void main() {
       expect(n.remainingRounded, 1020);
     });
 
+    test('a fresh store logs nothing until the user does', () {
+      final n = NutritionService.forToday(PulseStore());
+      expect(n.food, 0, reason: 'no sample intake on a new install');
+      expect(n.fiber, 0);
+    });
+
     test('fiber aggregates across diary entries', () {
       final s = PulseStore();
-      final n = NutritionService.forToday(s);
-      // f1(0)+f3*1.2(0)+f4(3.5)+f6(0) from seed diary
-      expect(n.fiber, closeTo(3.5, 0.01));
+      s.addFood(PulseData.foodById('f4'), 1, MealType.lunch); // 3.5 g
+      s.addFood(PulseData.foodById('f18'), 2, MealType.lunch); // 12.6 g
+      s.addFood(PulseData.foodById('f10'), 1, MealType.lunch); // 6.4 g
+      expect(NutritionService.forToday(s).fiber, closeTo(22.5, 0.01));
     });
 
     test('meal subtotals sum to food total', () {
@@ -73,7 +88,7 @@ void main() {
       final s = PulseStore();
       final n = NutritionService.forToday(s);
       final hint = n.proteinHint(s.goals.proteinGoal);
-      expect(hint, contains('${(135 - n.protein).round()} g'));
+      expect(hint, contains('${(s.goals.proteinGoal - n.protein).round()} g'));
       expect(hint.toLowerCase(), isNot(contains('fail')));
     });
 
@@ -162,6 +177,9 @@ void main() {
     });
     test('food streak reflects live diary state', () {
       final s = PulseStore();
+      expect(ConsistencyStore(s).foodStreak.current, 0,
+          reason: 'nothing logged yet on a new install');
+      s.addFood(PulseData.foodById('f1'), 1, MealType.breakfast);
       expect(ConsistencyStore(s).foodStreak.current, greaterThanOrEqualTo(1));
       s.diary.clear();
       expect(ConsistencyStore(s).foodStreak.current, 0);
@@ -175,7 +193,8 @@ void main() {
       r.hour = 18;
       expect(r.timeLabel, '6:30 PM');
       r.hour = 0;
-      expect(r.timeLabel, '12:00 AM');
+      expect(r.timeLabel, '12:30 AM'); // midnight keeps its minute
+
     });
     test('repeat modes fire on correct weekdays', () {
       final daily = Reminder(id: 'a', title: 'x', body: 'y', hour: 8, minute: 0);
@@ -247,7 +266,8 @@ void main() {
       await s.flushPendingSave();
       await s.deleteAllLocalData();
       expect(s.reminders.book.all, isEmpty);
-      expect(s.habitEnabled['Water'], false); // catalog default was off? no — default true
+      expect(s.habitEnabled['Water'], true,
+          reason: 'erasure restores the catalog default, which is on');
     }, skip: false);
 
     test('v3 snapshots hydrate cleanly into v4 store (additive migration)', () async {

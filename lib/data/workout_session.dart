@@ -198,7 +198,10 @@ class WorkoutSession {
       Difficulty.intermediate => 6.2,
       Difficulty.advanced => 7.4,
     };
-    return (elapsed.inSeconds / 60 * perMin).round().clamp(0, 2000);
+    final est = (elapsed.inSeconds / 60 * perMin).round();
+    // Floor at 1 kcal once any set is logged: work was done even if the
+    // session was finished in the same tick it started.
+    return est.clamp(sets.isEmpty ? 0 : 1, 2000);
   }
 
   /// Volume formatted like §37: "8,640 kg".
@@ -373,11 +376,11 @@ class WorkoutSessionManager {
     }
   }
 
-  /// WP3.4 — seed the sample workout history (§84 Alex Morgan: "You've
-  /// completed 20 workouts", weekly report "Workouts: 4"). Seeded rows
-  /// carry fixed wall-clock dates so charts look realistic on first
-  /// launch, but are flagged [seeded] so they never inflate *today's*
-  /// counters or streaks. Only applied when the user has no real data.
+  /// WP3.4 — import pre-existing workout history (for example from a
+  /// migration or a connected health source). Imported rows are flagged
+  /// [seeded] so they never inflate *today's* counters or streaks, and are
+  /// only applied when the user has no real data. Unused on a fresh install:
+  /// history comes from sessions the user actually completes.
   void seedHistory(List<WorkoutSession> sessions) {
     if (_history.isNotEmpty || _active != null) return; // never clobber real data
     _history.addAll(sessions);

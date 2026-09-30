@@ -43,7 +43,7 @@ class PulsePricing {
   /// Agreed competitive pricing — single source of truth for every UI.
   static const monthly = PulsePrice('pulse_pro_monthly', 'Monthly', 9.99, 'month');
   static const yearly =
-      PulsePrice('pulse_pro_yearly', 'Yearly · save 50%', 59.99, 'year', savingsNote: '≈ $4.99/month');
+      PulsePrice('pulse_pro_yearly', 'Yearly · save 50%', 59.99, 'year', savingsNote: '≈ \$4.99/month');
   static const trialDays = 3;
 
   static String money(double v) =>

@@ -22,6 +22,9 @@ void main() {
   testWidgets('FLOW B — food logging updates totals and persists', (tester) async {
     final store = await hydratedStore();
     await tester.pumpWidget(PulseApp(store: store));
+    // Splash schedules a bare 1600 ms Future.delayed before it replaces
+    // itself with /welcome; pump past it so no timer outlives the test (§75).
+    await tester.pump(const Duration(milliseconds: 1700));
     await tester.pumpAndSettle();
 
     // Direct store mutation mirrors what FoodDetailScreen's button does,
@@ -40,11 +43,13 @@ void main() {
   testWidgets('FLOW — water quick log persists across restart', (tester) async {
     final store = await hydratedStore();
     await tester.pumpWidget(PulseApp(store: store));
+    // See FLOW B: drain the splash's 1600 ms hand-off timer.
+    await tester.pump(const Duration(milliseconds: 1700));
     await tester.pumpAndSettle();
 
     store.addWater(0.25);
     await tester.pump();
-    expect(store.waterLogged, closeTo(1.95, 0.001)); // 1.7 seeded + 0.25
+    expect(store.waterLogged, closeTo(0.25, 0.001)); // nothing logged before
 
     await store.flushPendingSave();
     final revived = await hydratedStore();
@@ -58,5 +63,8 @@ void main() {
     await tester.pumpWidget(const PulseApp());
     await tester.pump();
     expect(find.byType(PulseScope), findsOneWidget);
+    // Let the splash's hand-off timer fire rather than leaving it pending.
+    await tester.pump(const Duration(milliseconds: 1700));
+    await tester.pumpAndSettle();
   });
 }

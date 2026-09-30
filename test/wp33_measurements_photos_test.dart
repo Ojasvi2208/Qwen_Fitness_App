@@ -168,11 +168,12 @@ void main() {
       expect(s.measurements.historyFor('waist'), isEmpty); // seed erased too
       expect(s.measurements.sites.length, kDefaultMeasurementSites.length);
       expect(s.progressPhotos.all, isEmpty);
-      // and it stays erased after a restart
-      final s2 = PulseStore();
-      await s2.initLocal(SharedPreferencesLocalRepository());
-      expect(s2.measurements.historyFor('waist'), isEmpty);
-      expect(s2.progressPhotos.all, isEmpty);
+      // and it stays erased on disk: clearAll removed the snapshot, so the
+      // records cannot be reloaded on a later launch
+      final disk = SharedPreferencesLocalRepository();
+      await disk.init();
+      expect(await disk.readSnapshot(), isNull,
+          reason: 'erased measurements must not survive on disk');
     });
 
     test('v2 snapshot without measurements/photos hydrates to defaults', () async {
@@ -198,9 +199,9 @@ void main() {
       final s = await freshStore();
       s.logMeasurement('hips', 99.0);
       final exported = jsonDecode(s.exportUserDataJson()) as Map<String, dynamic>;
-      expect(exported['schemaVersion'], 3);
-      // seed dates land on the 15th, so a fresh log creates a new day entry
-      expect(((exported['measurements'] as Map)['history'] as Map)['hips'], hasLength(3));
+      expect(exported['schemaVersion'], kPulseSchemaVersion);
+      // only the entry this test logged: a new install ships no history
+      expect(((exported['measurements'] as Map)['history'] as Map)['hips'], hasLength(1));
     });
   });
 }

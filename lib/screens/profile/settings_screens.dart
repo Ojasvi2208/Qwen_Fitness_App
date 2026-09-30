@@ -30,8 +30,9 @@ class ProfileScreen extends StatelessWidget {
             ]),
             const SizedBox(width: PulseSpacing.m),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Alex Morgan', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 21)),
-              Text('Member since March 2026', style: Theme.of(context).textTheme.bodySmall),
+              Text(store.userName, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 21)),
+              if (store.memberSince.isNotEmpty)
+                Text('Member since ${store.memberSince}', style: Theme.of(context).textTheme.bodySmall),
               if (store.premium)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -136,11 +137,15 @@ class PersonalDetailsScreen extends StatelessWidget {
     return PulseScaffold(
       title: 'Personal Details',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        TextField(controller: TextEditingController(text: 'Alex Morgan'), decoration: InputDecoration(labelText: 'Full name')),
+        TextField(
+            controller: TextEditingController(text: store.userName),
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Full name'),
+            onSubmitted: (v) => store.setProfile(name: v)),
         const SizedBox(height: PulseSpacing.m),
-        TextField(controller: TextEditingController(text: 'alex.morgan@email.com'), decoration: InputDecoration(labelText: 'Email', helperText: 'Changing this sends a verification link.')),
-        const SizedBox(height: PulseSpacing.m),
-        TextField(controller: TextEditingController(text: 'March 2026'), decoration: InputDecoration(labelText: 'Member since', enabled: false)),
+        TextField(
+            controller: TextEditingController(text: store.memberSince),
+            decoration: const InputDecoration(labelText: 'Member since', enabled: false)),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Units (§59)'),
         PulseCard(
@@ -153,7 +158,7 @@ class PersonalDetailsScreen extends StatelessWidget {
         ),
         const SizedBox(height: PulseSpacing.l),
         SecondaryButton(label: 'Change Password', icon: Icons.lock_reset_rounded,
-            onTap: () => pulseSnack(context, 'A secure password-reset link was sent to alex.morgan@email.com.', icon: Icons.mark_email_read_rounded)),
+            onTap: () => pulseSnack(context, 'A secure password-reset link is on its way.', icon: Icons.mark_email_read_rounded)),
         const SizedBox(height: PulseSpacing.s),
         OutlinedButton(onPressed: () async {
           final ok = await pulseConfirm(context,

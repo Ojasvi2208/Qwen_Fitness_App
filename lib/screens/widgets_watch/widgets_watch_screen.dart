@@ -119,7 +119,7 @@ class _WidgetLarge extends StatelessWidget {
         decoration: BoxDecoration(color: const Color(0xFF1B2A24), borderRadius: BorderRadius.circular(28)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('Good morning, Alex', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white)),
+            const Text('Good morning', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white)),
             const Spacer(),
             const PulseRing(value: 0.74, color: PulseColors.primary, size: 34, stroke: 4,
                 child: Text('74%', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Colors.white))),

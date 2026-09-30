@@ -13,7 +13,8 @@ import 'workout_session.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// PULSE APP STATE — lightweight InheritedNotifier store (no external
-/// deps, implementable in React Native too). Sample user: Alex Morgan.
+/// deps, implementable in React Native too). All user data is captured
+/// during onboarding (§14); nothing is pre-filled.
 /// Analytics events are annotated as `track('event_name')` calls.
 /// Privacy rule: never track sensitive health values, only behavior.
 /// ═══════════════════════════════════════════════════════════════════
@@ -115,32 +116,35 @@ class PulseStore extends ChangeNotifier {
     return scope!.notifier!;
   }
 
-  // ── Sample user (§84): consistent across every screen ────────────
-  final String userName = 'Alex Morgan';
-  final String userFirstName = 'Alex';
-  final int age = 32;
-  final double heightCm = 178;
-  final double startWeight = 84.5;
-  double currentWeight = 79.8;
-  final String memberSince = 'March 2026';
+  // ── Profile (§14): captured during onboarding, never pre-filled ───
+  // A new install shows the onboarding flow first and every figure below
+  // comes from the person using the app. Empty name == not yet onboarded.
+  String userName = '';
+  String userFirstName = '';
+  int age = 0;
+  double heightCm = 0;
+  double startWeight = 0;
+  double currentWeight = 0;
+  String memberSince = '';
 
+  /// True once onboarding has captured a profile (§14). Drives the launch
+  /// route: no profile yet → onboarding rather than the dashboard.
+  bool get hasProfile => userName.isNotEmpty;
+
+  /// Default targets shown while the goal step is still open; onboarding
+  /// overwrites them from the user's own details (§14 step 9).
   final Goals goals = Goals(
-    calorieGoal: 2050, proteinGoal: 135, carbGoal: 220, fatGoal: 70,
-    waterGoalLiters: 2.6, stepGoal: 8000, targetWeightKg: 75, workoutsPerWeek: 4,
+    calorieGoal: 2000, proteinGoal: 120, carbGoal: 200, fatGoal: 65,
+    waterGoalLiters: 2.5, stepGoal: 8000, targetWeightKg: 0, workoutsPerWeek: 3,
   );
 
-  // ── Today's logged state (matches brief numbers) ─────────────────
-  final List<DiaryEntry> diary = [
-    DiaryEntry(id: 'e1', food: PulseData.foods[0], servings: 1, meal: MealType.breakfast),
-    DiaryEntry(id: 'e2', food: PulseData.foods[2], servings: 1.2, meal: MealType.lunch),
-    DiaryEntry(id: 'e3', food: PulseData.foods[3], servings: 1, meal: MealType.lunch),
-    DiaryEntry(id: 'e4', food: PulseData.foods[5], servings: 1, meal: MealType.dinner),
-  ];
+  // ── Today's logged state — empty until the user logs something ────
+  final List<DiaryEntry> diary = [];
 
-  double activityCaloriesBurned = 310; // from exercise today
-  double stepsToday = 6842;
-  double waterLogged = 1.7; // liters
-  int workoutsCompletedToday = 1;
+  double activityCaloriesBurned = 0;
+  double stepsToday = 0;
+  double waterLogged = 0;
+  int workoutsCompletedToday = 0;
 
   /// ── WP3.5 Reminders (§58/§64) ───────────────────────────────────
   /// Models persist in the snapshot; OS scheduling lives behind the
@@ -230,27 +234,11 @@ class PulseStore extends ChangeNotifier {
 
   /// ── WP3.3 Body Measurements + Progress Photos (§45/§46) ─────────
   /// Metadata-only photo book — image bytes never enter the snapshot.
-  /// Seeded with Alex Morgan's sample history (§84) so the screen shows
-  /// realistic trend data on first launch; logging a value for today
-  /// upserts rather than duplicates (same semantics as the weight log).
-  MeasurementBook measurements = _seedMeasurements(MeasurementBook());
+  /// Both start empty: the trend screens show their empty state until the
+  /// user logs a measurement, and logging a value for today upserts rather
+  /// than duplicates (same semantics as the weight log).
+  MeasurementBook measurements = MeasurementBook();
   final ProgressPhotoBook progressPhotos = ProgressPhotoBook();
-
-  static MeasurementBook _seedMeasurements(MeasurementBook b) {
-    const seed = <(String, int, double)>[
-      ('body_fat', 6, 23.5), ('body_fat', 9, 21.4),
-      ('waist', 6, 94), ('waist', 9, 88),
-      ('chest', 6, 102), ('chest', 9, 101),
-      ('hips', 6, 103), ('hips', 9, 99),
-      ('arms', 6, 32.5), ('arms', 9, 33),
-      ('thighs', 6, 57), ('thighs', 9, 56),
-      ('neck', 6, 38), ('neck', 9, 38),
-    ];
-    for (final (id, mo, v) in seed) {
-      b.log(id, DateTime(2026, mo, 15), v);
-    }
-    return b;
-  }
 
   /// Log (or same-day replace) a measurement. Returns false for unknown
   /// sites or invalid values so the UI can show inline errors (§75).
@@ -304,17 +292,7 @@ class PulseStore extends ChangeNotifier {
 
   /// Weigh-in history (local-first). Seeded with the sample trend so
   /// charts have data on first launch; new entries are appended live.
-  final List<WeightRecord> weights = [
-    WeightRecord(DateTime(2026, 6, 1), 84.5),
-    WeightRecord(DateTime(2026, 6, 15), 83.6),
-    WeightRecord(DateTime(2026, 7, 1), 83.1),
-    WeightRecord(DateTime(2026, 7, 15), 82.4),
-    WeightRecord(DateTime(2026, 8, 1), 81.9),
-    WeightRecord(DateTime(2026, 8, 15), 81.0),
-    WeightRecord(DateTime(2026, 9, 1), 80.6),
-    WeightRecord(DateTime(2026, 9, 15), 80.1),
-    WeightRecord(DateTime(2026, 9, 29), 79.8),
-  ];
+  final List<WeightRecord> weights = [];
   /// ── PHASE 4: subscription state (single source of truth) ──────
   /// Legacy `premium` reads now derive from the entitlement engine so
   /// trial expiry, paid plans and ad policy can never disagree with UI.
@@ -376,7 +354,6 @@ class PulseStore extends ChangeNotifier {
   static const weightHistory = <(String, double)>[
     ('Jun 1', 84.5), ('Jun 15', 83.6), ('Jul 1', 83.1), ('Jul 15', 82.4),
     ('Aug 1', 81.9), ('Aug 15', 81.0), ('Sep 1', 80.6), ('Sep 15', 80.1),
-    ('Sep 29', 79.8),
   ];
   static const weeklyCalories = <int>[2120, 1980, 2065, 2210, 2040, 1995, 2145];
 
@@ -454,6 +431,8 @@ class PulseStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Null until the first real weigh-in; the headline figure falls back to
+  /// the profile weight captured during onboarding.
   double? currentWeightLive;
   double get displayWeight => currentWeightLive ?? currentWeight;
 
@@ -503,6 +482,27 @@ class PulseStore extends ChangeNotifier {
     if (calorieGoal != null) goals.calorieGoal = calorieGoal;
     if (proteinGoal != null) goals.proteinGoal = proteinGoal;
     track('goal_updated');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// §14 onboarding hand-off: records the profile the user actually entered,
+  /// replacing the sample identity. Only non-null fields are applied so a
+  /// partially completed flow never blanks what was already captured.
+  void setProfile({
+    String? name,
+    int? age,
+    double? heightCm,
+    double? startWeightKg,
+  }) {
+    if (name != null && name.trim().isNotEmpty) {
+      userName = name.trim();
+      userFirstName = userName.split(' ').first;
+    }
+    if (age != null) this.age = age;
+    if (heightCm != null) this.heightCm = heightCm;
+    if (startWeightKg != null) startWeight = startWeightKg;
+    track('profile_updated');
     _markDirty();
     notifyListeners();
   }
@@ -615,6 +615,20 @@ class PulseStore extends ChangeNotifier {
       }
     }
 
+    final prof = s['profile'];
+    if (prof is Map) {
+      final n = prof['name'];
+      if (n is String && n.trim().isNotEmpty) {
+        userName = n.trim();
+        userFirstName = userName.split(' ').first;
+      }
+      age = (prof['age'] as num?)?.toInt() ?? age;
+      heightCm = (prof['heightCm'] as num?)?.toDouble() ?? heightCm;
+      startWeight = (prof['startWeight'] as num?)?.toDouble() ?? startWeight;
+      final ms = prof['memberSince'];
+      if (ms is String && ms.isNotEmpty) memberSince = ms;
+    }
+
     final w = s['weights'];
     if (w is List && w.isNotEmpty) {
       weights.clear();
@@ -697,6 +711,13 @@ class PulseStore extends ChangeNotifier {
   /// Serializable snapshot of all *user* state (see block comment).
   Map<String, dynamic> toSnapshot() => {
         'schemaVersion': kPulseSchemaVersion,
+        'profile': {
+          'name': userName,
+          'age': age,
+          'heightCm': heightCm,
+          'startWeight': startWeight,
+          'memberSince': memberSince,
+        },
         'goals': {
           'calorie': goals.calorieGoal, 'protein': goals.proteinGoal,
           'carbs': goals.carbGoal, 'fat': goals.fatGoal,

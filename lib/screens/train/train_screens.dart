@@ -33,12 +33,16 @@ class TrainScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text('Upper Body Strength', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: PulseSpacing.xs),
-            const Row(children: [
-              Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
-              SizedBox(width: PulseSpacing.m),
-              Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
-              SizedBox(width: PulseSpacing.m),
-              Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
+            const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
+              ]),
             ]),
             const SizedBox(height: PulseSpacing.m),
             PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
@@ -87,13 +91,16 @@ class TrainScreen extends StatelessWidget {
               Expanded(flex: 2,
                   child: Container(width: double.infinity, decoration: BoxDecoration(gradient: LinearGradient(colors: [PulseColors.primary.withOpacity(0.7), PulseColors.secondary.withOpacity(0.8)])),
                       child: const Padding(padding: EdgeInsets.all(10), child: Icon(Icons.fitness_center_rounded, color: Colors.white54, size: 30)))),
-              Expanded(flex: 2,
+              Expanded(flex: 3,
                   child: Padding(
                     padding: const EdgeInsets.all(PulseSpacing.sm),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(w.name, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontSize: 14.5), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const Spacer(),
-                      Text('${w.minutes} min • ${w.level}', style: Theme.of(c).textTheme.labelSmall),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                      Flexible(
+                          child: Text(w.name, style: Theme.of(c).textTheme.titleMedium?.copyWith(fontSize: 14.5), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                      Text('${w.minutes} min • ${w.level}', style: Theme.of(c).textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                     ]),
                   )),
             ]),
@@ -869,7 +876,7 @@ class StepsScreen extends StatelessWidget {
                 Text('${s.stepsToday.toStringAsFixed(0)} / ${s.goals.stepGoal}', style: PulseTypography.metricMedium.copyWith(color: scheme.onSurface)),
                 const SizedBox(height: 4),
                 Text('Distance ${(s.stepsToday * 0.000715).toStringAsFixed(1)} km', style: Theme.of(context).textTheme.bodyMedium),
-                Text('Estimated activity calories 246', style: Theme.of(context).textTheme.bodySmall),
+                Text('Estimated activity calories ${(s.stepsToday * 0.04).round()}', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: PulseSpacing.s),
                 Text('A 10-minute walk would put you close to today\'s step target.',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary)),
@@ -879,15 +886,11 @@ class StepsScreen extends StatelessWidget {
         ),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Last 7 days'),
-        PulseCard(
-          child: Column(children: [
-            PulseBarChart(values: const [5760, 7600, 4880, 8000, 7040, 3600, 6842], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 8000, highlightIndex: 6),
-            const SizedBox(height: PulseSpacing.s),
-            Row(children: [for (final d in const ['M', 'T', 'W', 'T', 'F', 'S', 'S']) Expanded(child: Center(child: Text(d, style: Theme.of(context).textTheme.labelSmall))) ]),
-            const SizedBox(height: PulseSpacing.xs),
-            Text('Red line marks your 8,000-step daily goal. Bars show each day against it.',
-                style: Theme.of(context).textTheme.labelSmall),
-          ]),
+        const PulseCard(
+          child: EmptyState(
+              icon: Icons.bar_chart_rounded,
+              title: 'Your weekly pattern is building',
+              body: 'Each day of recorded steps adds a bar here, measured against your daily goal.'),
         ),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Source'),

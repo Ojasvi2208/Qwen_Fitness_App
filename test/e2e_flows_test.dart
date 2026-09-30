@@ -62,20 +62,54 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('FLOW A — New user onboarding → dashboard', () {
-    test('A1: fresh install boots with seeded sample profile (§84)', () async {
+    test('A1: fresh install carries no profile and no logged data (§14)',
+        () async {
       final repo = _MemRepo();
       final store = await bootFresh(repo);
-      expect(store.hydratedFromDisk, isTrue);
-      // Alex Morgan defaults must be present immediately — the plan
-      // screen values (§14 step 9) are the source of truth.
-      expect(store.goals.calorieGoal, 2050);
-      expect(store.goals.proteinGoal, 135);
-      expect(store.goals.carbGoal, 220);
-      expect(store.goals.fatGoal, 70);
-      expect(store.goals.waterGoalLiters, closeTo(2.6, 0.001));
-      expect(store.goals.stepGoal, 8000);
-      expect(store.goals.targetWeightKg, closeTo(75, 0.001));
-      expect(store.currentWeight, closeTo(79.8, 0.001));
+      expect(store.hydratedFromDisk, isFalse,
+          reason: 'a first launch has no snapshot to restore');
+      // Nothing belonging to anyone else may reach the dashboard: the
+      // launch route sends a profile-less store to onboarding instead.
+      expect(store.hasProfile, isFalse);
+      expect(store.userName, isEmpty);
+      expect(store.diary, isEmpty);
+      expect(store.weights, isEmpty);
+      expect(store.currentWeightLive, isNull);
+      expect(store.waterLogged, 0);
+      expect(store.stepsToday, 0);
+      expect(store.activityCaloriesBurned, 0);
+      expect(store.workoutsCompletedToday, 0);
+      expect(store.measurements.sites, isNotEmpty,
+          reason: 'the site catalog is app data, not user data');
+    });
+
+    test('A1c: a store with no data reports so, gating the trend screens',
+        () async {
+      final repo = _MemRepo();
+      final store = await bootFresh(repo);
+      expect(store.hasAnyData, isFalse,
+          reason: 'the 7-day trend screens show their empty state on this');
+      store.addWater(0.25);
+      expect(store.hasAnyData, isTrue);
+    });
+
+    test('A1b: onboarding captures the profile and the first weigh-in',
+        () async {
+      final repo = _MemRepo();
+      var store = await bootFresh(repo);
+      store.setProfile(
+          name: 'Priya Raman', age: 29, heightCm: 165, startWeightKg: 68);
+      store.setTargets(targetWeightKg: 62);
+      store.logWeight(68);
+      expect(store.hasProfile, isTrue);
+      expect(store.userFirstName, 'Priya');
+      await store.flushPendingSave();
+      store = await bootFresh(repo);
+      expect(store.userName, 'Priya Raman');
+      expect(store.age, 29);
+      expect(store.heightCm, closeTo(165, 0.001));
+      expect(store.weights.single.kg, closeTo(68, 0.001));
+      expect(store.goals.targetWeightKg, closeTo(62, 0.001));
     });
 
     test('A2: onboarding goal edit persists through restart', () async {
@@ -83,21 +117,15 @@ void main() {
       var store = await bootFresh(repo);
       store.updateGoals((g) => g.workoutsPerWeek = 5);
       await store.flushPendingSave();
-      // Defensive: if the autosave debounce ever regresses, guarantee
-      // the write lands before the restart assertion.
-      if (store.hydratedFromDisk || true) {
-        if (!repo.writesChangedFlag(store)) {
-          await repo.writeSnapshot(store.toSnapshot());
-        }
-      }
       store = await bootFresh(repo);
       expect(store.goals.workoutsPerWeek, 5);
     });
 
-    test('A3: first weigh-in from setup replaces seed row for today only',
+    test('A3: re-logging today replaces that row instead of duplicating it',
         () async {
       final repo = _MemRepo();
       final store = await bootFresh(repo);
+      store.logWeight(80.6);
       final before = store.weights.length;
       store.logWeight(80.1);
       expect(store.weights.length, before); // upsert, not duplicate
@@ -126,6 +154,7 @@ void main() {
       final kcal = store.foodKcal;
       final protein = store.protein;
       final count = store.diary.length;
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.diary.length, count);
       expect(store.foodKcal, closeTo(kcal, 0.001));
@@ -194,12 +223,12 @@ void main() {
       store.logSet(exerciseIndex: 0, setNumber: 2, reps: 10, weightKg: 20);
       store.logSet(exerciseIndex: 1, setNumber: 1, reps: 12, weightKg: 12);
       expect(session.totalSets, 3);
-      expect(session.volumeKg, closeTo(532, 0.001));
+      expect(session.volumeKg, closeTo(544, 0.001));
       final done = store.finishWorkout(rating: 1);
       expect(done, isNotNull);
       expect(done!.rating, 1);
       expect(store.sessions.activeSession, isNull);
-      expect(store.workoutsCompletedToday, greaterThanOrEqualTo(2));
+      expect(store.workoutsCompletedToday, 1);
       // Finish credits the session's estimated calories into the daily
       // activity burn (checked before any later mutation).
       expect(done!.estimatedKcal, greaterThan(0));
@@ -214,6 +243,7 @@ void main() {
       final finished = store.finishWorkout();
       final histLen = store.sessions.history.length;
       final burned = store.activityCaloriesBurned;
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.sessions.history.length, histLen);
       expect(store.sessions.history.first.templateName,
@@ -245,9 +275,12 @@ void main() {
   });
 
   group('FLOW E — Progress (range filter → chart data → insight)', () {
-    test('E1: weight trend endpoints match seeded history', () async {
+    test('E1: weight trend endpoints follow the logged history', () async {
       final repo = _MemRepo();
       final store = await bootFresh(repo);
+      store.setTargets(targetWeightKg: 75);
+      store.logWeight(84.5, date: DateTime(2026, 6, 1));
+      store.logWeight(79.8);
       expect(store.weights.first.kg, closeTo(84.5, 0.001)); // starting
       expect(store.currentWeightLive, closeTo(79.8, 0.001)); // current
       expect(store.goals.targetWeightKg, closeTo(75, 0.001));
@@ -258,6 +291,7 @@ void main() {
       final repo = _MemRepo();
       var store = await bootFresh(repo);
       store.logWeight(79.2);
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.weights.last.kg, closeTo(79.2, 0.001));
       expect(store.currentWeightLive, closeTo(79.2, 0.001));
@@ -280,7 +314,7 @@ void main() {
       final store = await bootFresh(repo);
       final r0 = store.remainingKcal;
       store.updateGoals((g) => g.calorieGoal = 2200);
-      expect(store.remainingKcal - r0, closeTo(150, 0.001));
+      expect(store.remainingKcal - r0, closeTo(200, 0.001));
     });
 
     test('F2: edited goals survive restart (no silent reset)', () async {
@@ -290,6 +324,7 @@ void main() {
         g.proteinGoal = 150;
         g.targetWeightKg = 74;
       });
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.goals.proteinGoal, 150);
       expect(store.goals.targetWeightKg, closeTo(74, 0.001));
@@ -301,7 +336,7 @@ void main() {
       final store = await bootFresh(repo);
       final draft = store.goals.clone();
       draft.calorieGoal = 9999;
-      expect(store.goals.calorieGoal, 2050); // live untouched until Confirm
+      expect(store.goals.calorieGoal, 2000); // live untouched until Confirm
     });
 
     test('F4: units preference persists independently of goals', () async {
@@ -309,6 +344,7 @@ void main() {
       var store = await bootFresh(repo);
       store.setUnitsWeight('lb');
       store.setUnitsDistance('mi');
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.unitsMass, 'lb');
       expect(store.unitsDistance, 'mi');
@@ -342,6 +378,7 @@ void main() {
       final repo = _MemRepo();
       var store = await bootFresh(repo);
       await store.purchasePro(PulsePricing.yearly);
+      await store.flushPendingSave();
       store = await bootFresh(repo);
       expect(store.premium, isTrue);
       expect(store.plan, PulsePlan.proYearly);
@@ -412,7 +449,7 @@ void main() {
       // instead of half-applying unknown data.
       await repo.writeSnapshot({'schemaVersion': 999, 'diary': 'not-a-list'});
       final store = await bootFresh(repo);
-      expect(store.goals.calorieGoal, 2050);
+      expect(store.goals.calorieGoal, 2000);
       expect(store.hydratedFromDisk, isFalse); // refused, not corrupted
     });
 
@@ -428,9 +465,9 @@ void main() {
         'goals': {'calorie': 'nope'},
       });
       final store = await bootFresh(repo);
-      expect(store.goals.calorieGoal, 2050);
-      expect(store.waterLogged, closeTo(1.7, 0.001)); // seed default kept
-      expect(store.diary.length, 3); // seeded diary untouched by garbage
+      expect(store.goals.calorieGoal, 2000); // default kept, garbage ignored
+      expect(store.waterLogged, 0);
+      expect(store.diary, isEmpty);
     });
 
     test('X3: export bundle contains user data and excludes catalogs',

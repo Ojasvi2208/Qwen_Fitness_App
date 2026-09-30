@@ -22,11 +22,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late int _step = widget.step;
   final Set<String> goals = {'Lose weight', 'Eat healthier'};
   final Set<String> motivations = {'Better nutrition', 'More energy'};
-  final TextEditingController _age = TextEditingController(text: '32');
-  final TextEditingController _height = TextEditingController(text: '178');
-  final TextEditingController _weight = TextEditingController(text: '82');
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _age = TextEditingController();
+  final TextEditingController _height = TextEditingController();
+  final TextEditingController _weight = TextEditingController();
   String _sex = 'Male';
-  double _targetWeight = 75;
+  double _targetWeight = 70;
   int _pace = 1; // Recommended
   int _activity = 2;
   int _exerciseFreq = 2;
@@ -37,15 +38,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     HapticFeedback.lightImpact();
-    if (_step == 8) context.pulse.track('onboarding_completed');
+    if (_step == 8) {
+      _commitProfile();
+      context.pulse.track('onboarding_completed');
+    }
     setState(() => _step = (_step + 1).clamp(0, _steps));
     if (_step == _steps) context.pulse.track('permissions_step_reached');
   }
 
   void _back() => setState(() => _step = (_step - 1).clamp(0, _steps));
 
+  void _commitProfile() {
+    final store = context.pulse;
+    final weight = double.tryParse(_weight.text);
+    store.setProfile(
+      name: _name.text,
+      age: int.tryParse(_age.text),
+      heightCm: double.tryParse(_height.text),
+      startWeightKg: weight,
+    );
+    store.setTargets(targetWeightKg: _targetWeight);
+    // First weigh-in: seeds the trend from the user's own entry.
+    if (weight != null) store.logWeight(weight);
+  }
+
   @override
-  void dispose() { _age.dispose(); _height.dispose(); _weight.dispose(); super.dispose(); }
+  void dispose() { _name.dispose(); _age.dispose(); _height.dispose(); _weight.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -119,6 +137,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _detailsPage(BuildContext c) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _heading(c, 'Tell us about yourself',
             'We use age, sex, height and weight only to estimate your metabolic needs. You can change or delete this anytime in Profile → Privacy.'),
+        TextField(controller: _name, textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Your name', hintText: 'What should we call you?')),
+        const SizedBox(height: PulseSpacing.m),
         TextField(controller: _age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Age', suffixText: 'years')),
         const SizedBox(height: PulseSpacing.m),
         Text('Biological sex for metabolic calculations', style: Theme.of(c).textTheme.titleMedium),
@@ -134,7 +155,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ]);
 
   Widget _targetPage(BuildContext c) {
-    final current = double.tryParse(_weight.text) ?? 82.0;
+    final current = double.tryParse(_weight.text) ?? 0;
     final diff = current - _targetWeight;
     final weeks = (diff / (0.25 + _pace * 0.35)).ceil();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

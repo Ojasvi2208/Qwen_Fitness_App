@@ -25,7 +25,11 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
-    context.pulse.track('today_viewed');
+    // Inherited widgets are not reachable from initState, so the view event
+    // waits for the first frame rather than throwing on entry.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.pulse.track('today_viewed');
+    });
     Future.delayed(const Duration(milliseconds: 900), () => mounted ? setState(() => _loading = false) : null);
   }
 
@@ -93,17 +97,21 @@ class _TodayScreenState extends State<TodayScreen> {
         padding: const EdgeInsets.all(PulseSpacing.l),
         onTap: () => Navigator.of(context).pushNamed('/progress'),
         child: Row(children: [
-          PulseRing(value: score / 100, color: scheme.primary, size: 84, stroke: 10,
+          PulseRing(value: score / 100, color: scheme.primary, size: 72, stroke: 9,
               child: Text('${score.toStringAsFixed(0)}%', style: PulseTypography.metricSmall.copyWith(color: scheme.onSurface))),
-          const SizedBox(width: PulseSpacing.l),
+          const SizedBox(width: PulseSpacing.m),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Today\'s Progress', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
               Text(score >= 70 ? 'You\'re building a strong day.' : 'Small consistent steps move the needle.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
               Text('A simple snapshot of your logging habits — not a medical health score.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12.5)),
             ]),
           ),
@@ -183,7 +191,11 @@ class _TodayScreenState extends State<TodayScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text('Macros', style: Theme.of(context).textTheme.titleMedium)),
-              Text('View nutrition', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+              Flexible(
+                  child: Text('View nutrition',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary))),
               Icon(Icons.chevron_right_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
             ]),
             MacroRow(label: 'Protein', current: s.protein, goal: s.goals.proteinGoal, color: PulseColors.protein, iconData: Icons.bolt_rounded),
