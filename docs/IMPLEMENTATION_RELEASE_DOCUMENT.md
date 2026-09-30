@@ -20,7 +20,7 @@ PULSE is a complete fitness + nutrition application implemented as a production-
 | 3 | Domain hardening: workout sessions, nutrition service, units, measurements/photos, streaks/reports/goal-review, reminders | ✅ Complete (`0854bb3`, `7443ce8`, `56b97d6`) |
 | 4 | Monetization & ads: entitlements engine, pricing, trial lifecycle, ad policy/slots, gateway seams | ✅ Complete (`a09ca97`, `6cb6250`) |
 | 5 | E2E flow tests (A–G) + master-flow regression suite | ✅ Complete — WP5.1 (`7c66e7e`), WP5.2 state-matrix sweep + `docs/PHASE5_TEST_PLAN.md`, WP5.3 accessibility sweeps |
-| 6 | Release prep: real In-App Purchase + AdMob adapters, receipt validation, deep links, flavors, platform config | ⬜ Not started |
+| 6 | Release prep: real In-App Purchase + AdMob adapters, receipt validation, deep links, flavors, platform config | 🟡 Android toolchain green; plugins declared and compiling; app builds, installs and runs on a Pixel 7 emulator. Adapters still fake-backed — **no real purchase, impression or notification yet**, and nothing on iOS (no Xcode). Health, camera, photo IO, signing and flavors not started. See [docs/PHASE6_STATUS.md](PHASE6_STATUS.md) |
 | 7 | Final documentation polish (this doc is the anchor deliverable) | 🟡 In progress |
 | — | **QA / test execution** | ⏳ Deferred to local machine (no Flutter SDK in authoring sandbox) |
 
@@ -73,7 +73,7 @@ pulse_app/
     └── e2e_flows_test.dart          (447)  30 tests: FLOW A–G service-level journeys incl. restart assertions, undo symmetry, destructive-action protection, paywall compliance
 ```
 
-**Totals:** ~10,800 lines of app code across 24 Dart files; ~2,700 lines of tests across 9 files; **201 test cases** (all passing); zero runtime dependencies beyond `shared_preferences`.
+**Totals:** ~10,800 lines of app code across 24 Dart files; ~3,100 lines of tests across 10 files; **224 test cases** (all passing); zero runtime dependencies beyond `shared_preferences`.
 
 ---
 
@@ -132,8 +132,9 @@ pulse_app/
 | widget_test | 3 | Widget | app boots in PulseScope; FLOW B through real widgets; water quick-log survives restart |
 | state_matrix_test | 44 | Widget | WP5.2 sweep — 7 screens × 5 states {first-run, empty, populated, premium-locked, offline} + per-state guarantees (§87) |
 | accessibility_test | 19 | Widget | WP5.3 — chart semantics, 1.5× text, reduce-motion, 48 px tap targets, high contrast (§70) |
+| phase6_adapters_test | 23 | Unit | Phase 6 billing/ads/notification adapters through backend fakes (§61, §63, §58) |
 
-**Measured total: 201 test cases**, all passing as of 2026-10-01 on Flutter 3.47.5.
+**Measured total: 224 test cases**, all passing as of 2026-10-01 on Flutter 3.47.5.
 Pass rate requirement for release gate: **100%** (zero failures allowed; flaky = bug).
 Per-suite detail and the deferred-state rationale live in
 [docs/PHASE5_TEST_PLAN.md](PHASE5_TEST_PLAN.md).
@@ -183,7 +184,7 @@ Per-suite detail and the deferred-state rationale live in
 git clone <your-repo-url> pulse_app && cd pulse_app
 flutter pub get
 flutter analyze            # GATE: 0 errors required (warnings triaged, not ignored)
-flutter test               # GATE: 201/201 pass — pass-rate requirement = 100%
+flutter test               # GATE: 224/224 pass — pass-rate requirement = 100%
 flutter test --coverage && lcov --summary coverage/lcov.info   # target ≥80% on lib/data/**
 flutter run -d <device>    # smoke: FLOW B (log food ≤4 taps), water +250 ml, kill app, relaunch → values persisted
 ```

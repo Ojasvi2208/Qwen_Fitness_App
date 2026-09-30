@@ -26,6 +26,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _age = TextEditingController();
   final TextEditingController _height = TextEditingController();
   final TextEditingController _weight = TextEditingController();
+  final _nameFocus = FocusNode();
+  final _ageFocus = FocusNode();
+  final _heightFocus = FocusNode();
+  final _weightFocus = FocusNode();
   String _sex = 'Male';
   double _targetWeight = 70;
   int _pace = 1; // Recommended
@@ -38,6 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     HapticFeedback.lightImpact();
+    _releaseFocus();
     if (_step == 8) {
       _commitProfile();
       context.pulse.track('onboarding_completed');
@@ -46,7 +51,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_step == _steps) context.pulse.track('permissions_step_reached');
   }
 
-  void _back() => setState(() => _step = (_step - 1).clamp(0, _steps));
+  void _back() {
+    _releaseFocus();
+    setState(() => _step = (_step - 1).clamp(0, _steps));
+  }
+
+  /// Hands focus back to the platform before the step subtree is replaced.
+  void _releaseFocus() {
+    for (final f in [_nameFocus, _ageFocus, _heightFocus, _weightFocus]) {
+      f.unfocus();
+    }
+  }
 
   void _commitProfile() {
     final store = context.pulse;
@@ -63,7 +78,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   @override
-  void dispose() { _name.dispose(); _age.dispose(); _height.dispose(); _weight.dispose(); super.dispose(); }
+  void dispose() {
+    _name.dispose();
+    _age.dispose();
+    _height.dispose();
+    _weight.dispose();
+    _nameFocus.dispose();
+    _ageFocus.dispose();
+    _heightFocus.dispose();
+    _weightFocus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +116,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Text('Step ${_step + 1} of $_steps', style: Theme.of(context).textTheme.labelMedium),
             ]),
           ),
-          Expanded(child: SingleChildScrollView(padding: const EdgeInsets.all(PulseSpacing.xl), child: _body(context))),
+          Expanded(
+            child: SingleChildScrollView(
+              key: ValueKey('onboarding_step_$_step'),
+              padding: const EdgeInsets.all(PulseSpacing.xl),
+              child: _body(context),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(PulseSpacing.xl, 0, PulseSpacing.xl, PulseSpacing.l),
             child: PrimaryButton(label: _step == 8 ? 'Start My Plan' : 'Continue', onTap: _next),
@@ -137,18 +168,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _detailsPage(BuildContext c) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _heading(c, 'Tell us about yourself',
             'We use age, sex, height and weight only to estimate your metabolic needs. You can change or delete this anytime in Profile → Privacy.'),
-        TextField(controller: _name, textCapitalization: TextCapitalization.words,
+        TextField(controller: _name, focusNode: _nameFocus,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _ageFocus.requestFocus(),
           decoration: const InputDecoration(labelText: 'Your name', hintText: 'What should we call you?')),
         const SizedBox(height: PulseSpacing.m),
-        TextField(controller: _age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Age', suffixText: 'years')),
+        TextField(controller: _age, focusNode: _ageFocus,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _heightFocus.requestFocus(),
+          decoration: const InputDecoration(labelText: 'Age', suffixText: 'years')),
         const SizedBox(height: PulseSpacing.m),
         Text('Biological sex for metabolic calculations', style: Theme.of(c).textTheme.titleMedium),
         const SizedBox(height: PulseSpacing.s),
         PulseSegmented(options: const ['Male', 'Female'], index: _sex == 'Male' ? 0 : 1, onChanged: (i) => setState(() => _sex = i == 0 ? 'Male' : 'Female')),
         const SizedBox(height: PulseSpacing.m),
-        TextField(controller: _height, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Height', suffixText: 'cm')),
+        TextField(controller: _height, focusNode: _heightFocus,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _weightFocus.requestFocus(),
+          decoration: const InputDecoration(labelText: 'Height', suffixText: 'cm')),
         const SizedBox(height: PulseSpacing.m),
-        TextField(controller: _weight, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        TextField(controller: _weight, focusNode: _weightFocus,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _releaseFocus(),
+          // Redraw so the validity hint tracks what has been typed.
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
               labelText: 'Current weight', suffixText: 'kg',
               errorText: double.tryParse(_weight.text) == null && _weight.text.isNotEmpty ? 'Enter a valid weight' : null)),

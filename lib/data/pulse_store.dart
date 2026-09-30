@@ -306,9 +306,16 @@ class PulseStore extends ChangeNotifier {
   String? get trialBanner => entitlements.trialBannerText();
 
   /// Start the one-shot 3-day Pro trial via the purchase gateway seam.
+  /// Platform billing, attached at startup when the build wires it. Null
+  /// means the stub is used, which is what tests and a bare run want.
+  PurchaseGateway? purchaseGateway;
+
+  /// Platform ads, attached at startup when the build wires it.
+  AdProvider? adProvider;
+
   Future<bool> startTrial({PurchaseGateway? gateway}) async {
     if (subscription.trialUsed || entitlements.isPro) return false;
-    final gw = gateway ?? StubPurchaseGateway();
+    final gw = gateway ?? purchaseGateway ?? StubPurchaseGateway();
     if (!await gw.purchase(PulsePricing.yearly)) return false;
     if (!entitlements.beginTrial()) return false;
     track('trial_started');
@@ -319,7 +326,7 @@ class PulseStore extends ChangeNotifier {
 
   /// Complete a paid purchase (monthly/yearly price from PulsePricing).
   Future<bool> purchasePro(PulsePrice price, {PurchaseGateway? gateway}) async {
-    final gw = gateway ?? StubPurchaseGateway();
+    final gw = gateway ?? purchaseGateway ?? StubPurchaseGateway();
     if (!await gw.purchase(price)) return false;
     entitlements.activatePaid(price);
     track('subscription_purchased', {'plan': price.cadence});
