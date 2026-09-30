@@ -226,9 +226,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _password = TextEditingController();
   bool _showPassword = false;
   bool _acceptedTerms = false;
+
+  /// A create-account request is in flight. Only ever true while something is
+  /// actually happening, so the button cannot spin forever (§75).
   bool _submitting = false;
 
+  /// The user has attempted to submit at least once. Validation messages stay
+  /// hidden until then: an untouched form must not open with three errors.
+  bool _attempted = false;
+
+  /// Focus is held explicitly so it can be released before navigating away.
+  /// Without this the platform keeps the old field registered as the input
+  /// target and a later tap on it raises no keyboard.
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
   String? get _emailError {
+    if (!_attempted) return null;
     final v = _email.text.trim();
     if (v.isEmpty) return 'Enter your email address';
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) return 'Enter a valid email address';
@@ -236,14 +250,54 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   String? get _passwordError {
+    if (!_attempted) return null;
     final v = _password.text;
     if (v.isEmpty) return 'Create a password';
     if (v.length < 8) return 'Use at least 8 characters';
     return null;
   }
 
+  /// Validity independent of whether messages are being shown, so the button
+  /// knows what to do before the first attempt.
+  bool get _isValid {
+    final e = _email.text.trim();
+    return e.isNotEmpty &&
+        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(e) &&
+        _password.text.length >= 8 &&
+        _acceptedTerms;
+  }
+
+  /// Hands focus back to the platform before leaving, so the next screen —
+  /// or this one, revisited — can raise the keyboard normally.
+  void _releaseFocus() {
+    _emailFocus.unfocus();
+    _passwordFocus.unfocus();
+  }
+
   @override
-  void dispose() { _email.dispose(); _password.dispose(); super.dispose(); }
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit(PulseStore store) async {
+    // First attempt switches the messages on; an invalid form stops here with
+    // the reasons visible and no spinner left running.
+    setState(() => _attempted = true);
+    if (!_isValid) return;
+
+    _releaseFocus();
+    setState(() => _submitting = true);
+    store.track('signup_completed');
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    // Clear before navigating so returning to this screen finds a live button.
+    setState(() => _submitting = false);
+    Navigator.of(context).pushReplacementNamed('/onboarding-goals');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -262,7 +316,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         const SizedBox(height: PulseSpacing.l),
         TextField(
           controller: _email,
+          focusNode: _emailFocus,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _passwordFocus.requestFocus(),
           autofillHints: const [AutofillHints.email],
           decoration: InputDecoration(
             labelText: 'Email',
@@ -278,7 +335,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         const SizedBox(height: PulseSpacing.m),
         TextField(
           controller: _password,
+          focusNode: _passwordFocus,
           obscureText: !_showPassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _releaseFocus(),
           autofillHints: const [AutofillHints.newPassword],
           decoration: InputDecoration(
             labelText: 'Password',
@@ -323,7 +383,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ]),
           ),
         ),
-        if (!_acceptedTerms && _submitting)
+        if (_attempted && !_acceptedTerms)
           Padding(
             padding: const EdgeInsets.only(bottom: PulseSpacing.s),
             child: Text('Please accept the Terms and Privacy Policy to continue.',
@@ -333,19 +393,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         PrimaryButton(
             label: 'Create Account',
             loading: _submitting,
-            onTap: (_emailError == null && _passwordError == null && _acceptedTerms)
-                ? () {
-                    setState(() => _submitting = true);
-                    store.track('signup_completed');
-                    Future.delayed(const Duration(milliseconds: 700), () {
-                      if (context.mounted) Navigator.of(context).pushReplacementNamed('/onboarding-goals');
-                    });
-                  }
-                : () => setState(() => _submitting = true)),
+            // Always tappable: an invalid form reveals what is missing rather
+            // than leaving a dead button the user cannot learn from (§75).
+            onTap: _submitting ? null : () => _submit(store)),
         const SizedBox(height: PulseSpacing.m),
         Center(
           child: TextButton(
-              onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+              onPressed: () {
+                _releaseFocus();
+                Navigator.of(context).pushReplacementNamed('/login');
+              },
               child: const Text('I already have an account')),
         ),
       ]),
