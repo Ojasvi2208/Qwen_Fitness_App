@@ -84,7 +84,7 @@ class PulseTheme {
         titleTextStyle: TextStyle(
             fontSize: 19, fontWeight: FontWeight.w700, color: textMain),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: hc ? (isDark ? PulseColors.darkSurfaceAlt : Colors.white) : surface,
         elevation: hc ? 0 : (isDark ? 0 : 0.5),
         margin: EdgeInsets.zero,
@@ -171,7 +171,7 @@ class PulseTheme {
         actionTextColor: scheme.tertiary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PulseRadius.m)),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PulseRadius.xl)),
         titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: textMain),
@@ -196,7 +196,7 @@ class PulseTheme {
         titleTextStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: textMain),
         subtitleTextStyle: TextStyle(fontSize: 14, color: textSec),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: scheme.primary,
         unselectedLabelColor: textSec,
         indicatorColor: scheme.primary,

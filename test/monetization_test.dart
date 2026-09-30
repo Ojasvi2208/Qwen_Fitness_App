@@ -236,7 +236,7 @@ void main() {
 
     test('legacy v1/v2 snapshot with only bool premium migrates to paid', () async {
       // Simulate an old snapshot written before Phase 4.
-      store.updateGoals((g) => g.calories = 2100); // force a save baseline
+      store.updateGoals((g) => g.calorieGoal = 2100); // force a save baseline
       store.flushPendingSave();
       final snap = Map<String, dynamic>.from(repo.stored!);
       snap.remove('subscription');

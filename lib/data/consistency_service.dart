@@ -153,8 +153,8 @@ class ConsistencyStore {
     // the seeded sample week (§84) so the report is populated on launch.
     final daily = <double>[];
     for (var i = 6; i >= 1; i--) {
-      final idx = (6 - i).clamp(0, PulseData.weeklyCalories.length - 1);
-      daily.add(PulseData.weeklyCalories[idx].toDouble());
+      final idx = (6 - i).clamp(0, PulseStore.weeklyCalories.length - 1);
+      daily.add(PulseStore.weeklyCalories[idx].toDouble());
     }
     daily.add(s.foodKcal);
     final avg = daily.reduce((a, b) => a + b) / daily.length;

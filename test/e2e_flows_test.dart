@@ -83,13 +83,6 @@ void main() {
       var store = await bootFresh(repo);
       store.updateGoals((g) => g.workoutsPerWeek = 5);
       await store.flushPendingSave();
-      // Defensive: if the autosave debounce ever regresses, guarantee
-      // the write lands before the restart assertion.
-      if (store.hydratedFromDisk || true) {
-        if (!repo.writesChangedFlag(store)) {
-          await repo.writeSnapshot(store.toSnapshot());
-        }
-      }
       store = await bootFresh(repo);
       expect(store.goals.workoutsPerWeek, 5);
     });
