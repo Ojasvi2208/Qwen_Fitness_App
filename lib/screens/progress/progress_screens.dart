@@ -198,7 +198,7 @@ class WeightProgressScreen extends StatelessWidget {
                 child: Icon(Icons.monitor_weight_rounded, size: 16, color: scheme.onSurface.withOpacity(0.6))),
             title: Text('${e.weightKg.toStringAsFixed(1)} kg', style: PulseTypography.metricSmall.copyWith(color: scheme.onSurface, fontSize: 16)),
             subtitle: Text(_fmtDate(e.date)),
-            trailing: IconButton3(icon: Icons.delete_outline_rounded, size: 38, tooltip: 'Delete entry',
+            trailing: IconButton3(icon: Icons.delete_outline_rounded, tooltip: 'Delete entry',
                 onTap: () async {
                   final ok = await pulseConfirm(context,
                       title: 'Delete this weigh-in?',
@@ -915,7 +915,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   Icon(Icons.auto_awesome_rounded, color: scheme.primary, size: 20),
                   const SizedBox(width: PulseSpacing.s),
                   Expanded(child: Text('Review your goals?', style: Theme.of(context).textTheme.titleMedium)),
-                  IconButton3(icon: Icons.close_rounded, size: 32, onTap: () => setState(() => _showAdjust = false)),
+                  IconButton3(icon: Icons.close_rounded, onTap: () => setState(() => _showAdjust = false)),
                 ]),
                 Text('Your weight and activity have changed since your plan was created. We suggest reviewing — your current targets stay exactly as they are until you confirm.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14.5, height: 1.45)),

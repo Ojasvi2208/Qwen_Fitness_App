@@ -101,7 +101,9 @@ class DestructiveButton extends StatelessWidget {
 }
 
 class IconButton3 extends StatelessWidget {
-  const IconButton3({super.key, required this.icon, this.onTap, this.size = 44, this.selected = false, this.tooltip});
+  /// [size] defaults to the 48 px Material minimum touch target (§70) —
+  /// a smaller value is reachable only with a precise pointer.
+  const IconButton3({super.key, required this.icon, this.onTap, this.size = 48, this.selected = false, this.tooltip});
   final IconData icon;
   final VoidCallback? onTap;
   final double size;
@@ -184,6 +186,7 @@ class PulseRing extends StatelessWidget {
   const PulseRing({
     super.key, required this.value, required this.color, this.size = 64, this.stroke = 8,
     this.trackColor, this.child, this.animate = true, this.backgroundColor,
+    this.semanticLabel,
   });
   final double value; // 0..1+ (clamped visually at 1, over-target shown by child text)
   final Color color;
@@ -193,10 +196,18 @@ class PulseRing extends StatelessWidget {
   final Widget? child;
   final bool animate;
   final Color? backgroundColor;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      label: semanticLabel ?? '${(value * 100).round()} percent of goal',
+      child: _ring(context, isDark),
+    );
+  }
+
+  Widget _ring(BuildContext context, bool isDark) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: animate ? 0 : value.clamp(0.0, 1.0), end: value.clamp(0.0, 1.0)),
       duration: PulseDuration.ringFill,
@@ -364,20 +375,34 @@ class _DonutPainter extends CustomPainter {
 
 // ── Line/Area chart — Chart/WeightTrend ────────────────────────────
 class PulseLineChart extends StatelessWidget {
-  const PulseLineChart({super.key, required this.points, this.goalY, this.color, this.area = true, this.height = 180, this.labels});
+  const PulseLineChart({super.key, required this.points, this.goalY, this.color, this.area = true, this.height = 180, this.labels, this.semanticLabel});
   final List<double> points;
   final double? goalY;
   final Color? color;
   final bool area;
   final double height;
   final List<String>? labels;
+  final String? semanticLabel;
+
+  /// Spoken summary: where the trend starts, where it ends, and the goal.
+  String get _summary {
+    if (points.isEmpty) return 'Trend chart with no data yet';
+    final first = points.first.toStringAsFixed(1);
+    final last = points.last.toStringAsFixed(1);
+    final trend = 'Trend from $first to $last';
+    return goalY == null ? trend : '$trend, goal ${goalY!.toStringAsFixed(0)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = color ?? Theme.of(context).colorScheme.primary;
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: CustomPaint(painter: _LinePainter(points: points, color: c, goalY: goalY, area: area)),
+    return Semantics(
+      label: semanticLabel ?? _summary,
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: CustomPaint(painter: _LinePainter(points: points, color: c, goalY: goalY, area: area)),
+      ),
     );
   }
 }
@@ -434,19 +459,33 @@ class _LinePainter extends CustomPainter {
 
 // ── Bar chart — Chart/CalorieBars ──────────────────────────────────
 class PulseBarChart extends StatelessWidget {
-  const PulseBarChart({super.key, required this.values, required this.labels, this.goal, this.height = 160, this.highlightIndex});
+  const PulseBarChart({super.key, required this.values, required this.labels, this.goal, this.height = 160, this.highlightIndex, this.semanticLabel});
   final List<double> values;
   final List<String> labels;
   final double? goal;
   final double height;
   final int? highlightIndex;
+  final String? semanticLabel;
+
+  /// Spoken summary: the range and the goal, which is what the bars convey.
+  String get _summary {
+    if (values.isEmpty) return 'Chart with no data yet';
+    final lo = values.reduce(math.min).round();
+    final hi = values.reduce(math.max).round();
+    final span = '${values.length} day chart ranging from $lo to $hi';
+    return goal == null ? span : '$span, against a goal of ${goal!.round()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme.primary;
-    return SizedBox(
-      height: height,
-      child: CustomPaint(
-          painter: _BarPainter(values: values, goal: goal, color: c, highlight: highlightIndex)),
+    return Semantics(
+      label: semanticLabel ?? _summary,
+      child: SizedBox(
+        height: height,
+        child: CustomPaint(
+            painter: _BarPainter(values: values, goal: goal, color: c, highlight: highlightIndex)),
+      ),
     );
   }
 }

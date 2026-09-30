@@ -49,18 +49,19 @@ flutter test --coverage    # writes coverage/lcov.info
 ## 3. Expected output
 
 ```
-flutter analyze  →  0 errors (13 warnings, 238 info — see §6 Known deviation)
-flutter test     →  00:02 +182: All tests passed!
+flutter analyze  →  0 errors (13 warnings, 239 info — see §6 Known deviation)
+flutter test     →  00:01 +201: All tests passed!
 ```
 
 Anything other than `All tests passed!` fails the gate. Paste real console
 output when reporting a run; a claimed pass without it is not a pass.
 
-## 4. Inventory — 182 cases across 8 suites
+## 4. Inventory — 201 cases across 9 suites
 
 | Suite | Cases | Type | Covers |
 |---|---|---|---|
 | `state_matrix_test` | 44 | Widget | WP5.2 sweep: 7 screens × 5 states, plus per-state guarantees |
+| `accessibility_test` | 19 | Widget | WP5.3: chart semantics, 1.5× text, reduce-motion, 48 px tap targets, high contrast |
 | `e2e_flows_test` | 32 | Service-level E2E | Flows A–G, cross-flow consistency guards |
 | `monetization_test` | 25 | Unit | trial lifecycle, entitlements, ad policy, snapshot round-trip |
 | `wp3_services_test` | 25 | Unit | nutrition equation, units, streaks, weekly report, reminders |
@@ -120,7 +121,7 @@ behaviour, and none was introduced by WP5.2. The info-level lints are cosmetic:
 mostly `deprecated_member_use` for `withOpacity` (superseded by `withValues`)
 and `prefer_const_constructors`.
 
-**The enforced gate is therefore: zero errors, 182/182 passing.** Clearing the
+**The enforced gate is therefore: zero errors, 201/201 passing.** Clearing the
 13 warnings and the 238 infos is worthwhile cleanup but is not part of WP5.2;
 until it is done, the doc's literal `No issues found!` wording overstates what
 the suite guarantees.
@@ -141,3 +142,39 @@ size (390×844), not artifacts of the 800×600 test viewport:
 
 Widget sweeps earn their place by finding this class of bug, which unit tests
 structurally cannot see.
+
+## 8. WP5.3 — accessibility (§70)
+
+Two of the three accessibility toggles in Settings were inert before this work:
+`largeText` and `reduceMotion` could be switched, persisted and restored, but
+nothing read them. Only `highContrast` was wired, into `PulseTheme`.
+
+Both are now applied once in `main.dart` through a `MediaQuery` override, rather
+than threaded through the twelve `PulseDuration` sites and every `Text`:
+
+- `largeText` composes with the platform scale via
+  `textScaler.clamp(minScaleFactor: kPulseLargeTextScale)`, so the in-app toggle
+  only ever enlarges — a user who already set a 2× system scale is never shrunk.
+- `reduceMotion` sets `disableAnimations`, which `AnimatedContainer`,
+  `AnimatedOpacity`, `TweenAnimationBuilder` and the route transitions already
+  honour. Either the flag or the OS setting is enough to still the interface.
+
+All three chart types (`PulseRing`, `PulseBarChart`, `PulseLineChart`) are
+`CustomPaint`, which is invisible to a screen reader. Each now carries a
+`Semantics` label, defaulting to a summary derived from its own data and
+overridable per call site, so no metric is silent.
+
+### What the sweep found
+
+- `IconButton3` defaulted to **44 px**, under the 48 px Material minimum, so
+  every icon button in the app was slightly too small. The default is now 48.
+- Four call sites overrode it smaller still — 36 px on the add-to-meal button,
+  38 px on a delete and an info button, 32 px on a close. All now inherit 48.
+- The 1.5× text sweep on Today, Diary, Train and Progress found **no**
+  overflows, which was not the expected result and is worth recording.
+
+### Deferred
+
+Golden-image tests for `pressed`, `focused` and `disabled`, per the WP5.2
+deferred table. Screen-reader traversal order is asserted only through label
+presence, not order.

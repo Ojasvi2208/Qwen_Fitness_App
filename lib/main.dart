@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/pulse_store.dart';
 import 'data/persistence/local_backend.dart';
 import 'theme/pulse_theme.dart';
+import 'theme/tokens.dart';
 import 'widgets/common.dart';
 import 'widgets/pulse_components.dart';
 import 'screens/auth/auth_screens.dart';
@@ -95,6 +96,21 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
           themeMode: store.themeMode,
           initialRoute: '/',
           onGenerateRoute: _onGenerateRoute,
+          builder: (ctx, child) {
+            final media = MediaQuery.of(ctx);
+            return MediaQuery(
+              data: media.copyWith(
+                // Compose with the platform scale rather than replacing it, so
+                // a user who already enlarged text system-wide is not shrunk.
+                textScaler: store.largeText
+                    ? media.textScaler.clamp(minScaleFactor: kPulseLargeTextScale)
+                    : media.textScaler,
+                // Either source may ask for stillness; both are honoured.
+                disableAnimations: store.reduceMotion || media.disableAnimations,
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
         );
       }),
     );
