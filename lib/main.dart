@@ -1,7 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'data/pulse_store.dart';
 import 'data/persistence/local_backend.dart';
+import 'data/platform/ad_backend_impl.dart';
+import 'data/platform/admob_provider.dart';
+import 'data/platform/billing_backend_impl.dart';
+import 'data/platform/billing_gateway.dart';
+import 'data/platform/local_notification_scheduler.dart';
+import 'data/platform/notification_backend_impl.dart';
 import 'theme/pulse_theme.dart';
 import 'theme/tokens.dart';
 import 'widgets/common.dart';
@@ -17,6 +25,12 @@ import 'screens/coach/coach_screens.dart';
 import 'screens/profile/settings_screens.dart';
 import 'screens/profile/premium_screens.dart';
 import 'screens/widgets_watch/widgets_watch_screen.dart';
+
+/// Whether to wire the real billing, ads and notification plugins.
+/// Off by default so tests and `flutter run` on a bare checkout use the
+/// stubs; a store build passes `--dart-define=PULSE_PLATFORM_SERVICES=true`.
+const bool kUsePlatformServices =
+    bool.fromEnvironment('PULSE_PLATFORM_SERVICES');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,12 +67,35 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
   Future<void> _bootstrap() async {
     final repo = SharedPreferencesLocalRepository();
     try {
-      await _store.attachPersistence(repo);
+      if (kUsePlatformServices) {
+        _store.purchaseGateway =
+            InAppPurchaseGateway(backend: InAppPurchaseBackend());
+      }
+      await _store.attachPersistence(repo,
+          reminderScheduler: kUsePlatformServices ? _scheduler() : null);
     } catch (e) {
       // Persistence failure must never block the app (§74 error posture).
       debugPrint('PULSE persistence unavailable: $e');
     }
+    if (kUsePlatformServices) unawaited(_initAds());
     if (mounted) setState(() {}); // re-scope with hydrated store if swapped
+  }
+
+  /// Real OS scheduling, behind the same seam the stub uses.
+  LocalNotificationScheduler _scheduler() => LocalNotificationScheduler(
+      backend: FlutterLocalNotificationsBackend());
+
+  Future<void> _initAds() async {
+    try {
+      final provider = AdMobProvider(
+          backend: GoogleMobileAdsBackend(),
+          units: AdUnitIds.fromEnvironment());
+      await provider.initialize();
+      _store.adProvider = provider;
+    } catch (e) {
+      // No ads is a degraded state, never a blocked app (§61).
+      debugPrint('PULSE ads unavailable: $e');
+    }
   }
 
   @override
