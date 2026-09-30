@@ -55,6 +55,10 @@ class PulseOpacity {
 }
 
 // ── Animation durations ────────────────────────────────────────────
+/// §70 larger-text scale applied when the in-app accessibility toggle is on.
+/// Composed with the platform scale, never replacing it.
+const double kPulseLargeTextScale = 1.3;
+
 class PulseDuration {
   const PulseDuration._();
   static const Duration instant = Duration(milliseconds: 120);

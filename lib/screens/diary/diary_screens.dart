@@ -127,7 +127,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
               const SizedBox(width: PulseSpacing.sm),
               Expanded(child: Text('${meal.label} · ${store.kcalFor(meal).toStringAsFixed(0)} kcal',
                   style: Theme.of(context).textTheme.titleMedium)),
-              IconButton3(icon: Icons.add_rounded, selected: true, size: 36,
+              IconButton3(icon: Icons.add_rounded, selected: true,
                   onTap: () {
                     store.track('food_search_started');
                     Navigator.of(context).pushNamed('/food-search', arguments: meal);

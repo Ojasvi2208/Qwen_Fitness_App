@@ -261,7 +261,7 @@ class WorkoutDetailScreen extends StatelessWidget {
                   child: Text('${i + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary))),
               title: Text(PulseData.upperBodyExercises[i].name, style: Theme.of(context).textTheme.titleMedium),
               subtitle: Text('${PulseData.upperBodyExercises[i].sets} · ${PulseData.upperBodyExercises[i].muscle}'),
-              trailing: IconButton3(icon: Icons.info_outline_rounded, size: 38,
+              trailing: IconButton3(icon: Icons.info_outline_rounded,
                   onTap: () => Navigator.of(context).pushNamed('/exercise-instructions', arguments: PulseData.upperBodyExercises[i].name)),
             ),
           ),
