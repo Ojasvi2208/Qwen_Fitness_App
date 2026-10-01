@@ -111,29 +111,38 @@ O-series is closed.
 
 ---
 
-## 3. Known-fabricated screens — not fixed, deliberately
+## 3. Fabricated screens — resolved
 
-Eight screens remain invented end to end. Each needs either store wiring or an
-empty state, and each is a user-visible falsehood of the same class as the
-removed sample profile.
+All eight are wired or honestly empty as of this session. The owner's decision
+was store-wire, not empty-state, which required a daily history the store had
+never kept: `lib/data/day_archive.dart`, one `DayRecord` per calendar day,
+bounded to 92 days, filled by `PulseStore.rolloverIfNeeded`.
 
-| Screen | What it claims |
+| Screen | Now reads |
 |---|---|
-| `WeeklyReportScreen` | every row — "58,420 steps", "5 / 7 protein days", "Sep 21–27" |
-| `StreaksScreen` | "7-day streak", earned/unearned badges, "18 of the last 21 days" |
-| `ActivityDetailScreen` | "5.26 km", "31:42", "146 bpm", plus a painted fake GPS route |
-| `WidgetsWatchScreen` | every tile value |
-| `_ProgressCalendar`, `_HistoryCalendar` | activity dots from `d % 3 == 0` arithmetic |
-| `WaterScreen` "Today's sips" | five fake timestamped entries, each with a working delete button |
-| `NotificationsScreen` | "You've completed 20 workouts" |
-| onboarding `_planPage` | "2,050 kcal" under the words "Built from your answers" — see N3, which is worse than it looks |
+| `WeeklyReportScreen` | archive totals over the span actually recorded; empty state under 1 logged day |
+| `StreaksScreen` | `streakAsOf` / `streakWhere`; badges earned against real totals |
+| `ActivityDetailScreen` | completed `WorkoutSession` history. Distance, heart rate and the painted GPS route **removed** — no sensor or permission backs them |
+| `WidgetsWatchScreen` | live store values in every tile |
+| `_ProgressCalendar`, `_HistoryCalendar` | `archive.forDay`, real month and length |
+| `WaterScreen` "Today's sips" | real `WaterSip` entries; delete acts on the entry |
+| `NotificationsScreen` | scheduled reminders, with a warning when permission is off |
+| onboarding `_planPage` | computed by `PulseEnergyPlan` (N3, previous session) |
 
-`PulseData.habits`, `.insights`, `.notifications`, `.achievements` and
-`.weeklyStepChart` are the shared sources behind several of these.
+**N1 resolved.** The "Enable Notifications" stub now calls
+`ReminderManager.ensurePermission()`, which already existed and was unused.
+Verified on the emulator: the real dialog appears, Allow leaves
+`POST_NOTIFICATIONS granted=true` in `dumpsys`, the button settles to
+"Notifications enabled". The health, camera and location cards state that they
+are requested in context rather than claiming a dialog they cannot open.
 
-**Risk if Step 2's goldens are approved before this is addressed:** the
-fabricated figures become the approved reference images, and a later honest fix
-then reads as a regression.
+**Defect found while wiring, unrelated to the fabricated screens:** nothing ever
+reset the daily scalars. `stepsToday`, `waterLogged` and
+`workoutsCompletedToday` accumulated across calendar days without limit. The
+rollover fixes it; `rolloverIfNeeded` is called on boot and on resume.
+
+**Goldens are no longer blocked by this section.** The remaining blocker is the
+Step 3a overflow work.
 
 ---
 
