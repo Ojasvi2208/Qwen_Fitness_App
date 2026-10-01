@@ -126,7 +126,7 @@ removed sample profile.
 | `_ProgressCalendar`, `_HistoryCalendar` | activity dots from `d % 3 == 0` arithmetic |
 | `WaterScreen` "Today's sips" | five fake timestamped entries, each with a working delete button |
 | `NotificationsScreen` | "You've completed 20 workouts" |
-| onboarding `_planPage` | "2,050 kcal" under the words "Built from your answers" |
+| onboarding `_planPage` | "2,050 kcal" under the words "Built from your answers" — see N3, which is worse than it looks |
 
 `PulseData.habits`, `.insights`, `.notifications`, `.achievements` and
 `.weeklyStepChart` are the shared sources behind several of these.
@@ -186,9 +186,46 @@ The D4 manifest fix is still required and verified, but **this button cannot
 grant anything**, so a user who taps it gets a reassuring message and no
 permission. Pre-existing; not introduced by this work.
 
-**N2 — not a defect, recorded so it is not re-investigated.** The dashboard
-first showed 1088 kcal of food on a profile that had logged nothing. The cause
-was a *previous install's* snapshot on the same emulator (`revision 20`,
-`savedAt` an hour before the run), which hydration correctly restored. After
-`pm clear` the app returns to a clean welcome screen. Local-first persistence
-behaving as designed — **not** reseeded sample data.
+**N2 — a dashboard showing 1088 kcal on an apparently fresh profile.** Half of
+this is benign and half is a real defect; they were initially conflated.
+
+*Benign:* the food itself came from a *previous install's* snapshot on the same
+emulator (`revision 20`, `savedAt` an hour before the run), which `_hydrate`
+correctly restored. After `pm clear` the app returns to a clean welcome screen.
+Local-first persistence behaving as designed — **not** reseeded sample data.
+
+*Real:* the same screen showed goals of 2000/120/200/65 while onboarding's
+final page had just promised 2,050/135/220/70. That mismatch is **not** stale
+data — it is N3.
+
+**N3 — onboarding never writes the user's goals, and nothing computes them.**
+Three separable defects, all verified in source:
+
+1. `setTargets` ([pulse_store.dart:487](../lib/data/pulse_store.dart#L487))
+   accepts only `targetWeightKg`, `calorieGoal` and `proteinGoal` — **there is
+   no `carbGoal` or `fatGoal` parameter at all**. `_commitProfile`
+   ([onboarding_screen.dart:66](../lib/screens/auth/onboarding_screen.dart#L66))
+   passes only `targetWeightKg`. So the store defaults at
+   [pulse_store.dart:136](../lib/data/pulse_store.dart#L136) survive onboarding
+   untouched, and the comment above them — *"onboarding overwrites them from
+   the user's own details (§14 step 9)"* — **is false**. `updateGoals` is the
+   only path that can set all four; onboarding never calls it.
+2. The "Your daily plan is ready" page is hardcoded
+   ([onboarding_screen.dart:289–311](../lib/screens/auth/onboarding_screen.dart#L289)):
+   2,050 kcal / 135 g / 220 g / 70 g / 2.6 L / 8,000 are literals in the widget
+   tree, shown to every user regardless of input. These are the same constants
+   the removed sample profile used.
+3. **No goal computation exists anywhere in `lib/`** — no BMR, TDEE,
+   Mifflin-St Jeor or activity factor (grepped; zero hits). The "Why these
+   numbers?" dialog explains a derivation from "age, sex, height, weight and
+   activity level" that is not implemented.
+
+Observed live: entering age 28, height 178 cm, weight 78 kg changed no target.
+This is the most serious honesty defect found so far — the app states a
+personalised calculation it does not perform — and it is **larger than C1 as
+scoped**, so it is recorded here rather than fixed mid-step.
+
+Fixing it properly means deciding what the goals *should* be (a real
+Mifflin-St Jeor implementation against §14), which is a product decision, not a
+refactor. Until then the plan page should not claim the numbers were built from
+the user's answers.
