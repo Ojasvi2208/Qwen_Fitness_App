@@ -152,12 +152,43 @@ then reads as a regression.
 
 ## 5. Device verification
 
-The debug APK was built, installed and launched on the physical Moto Edge 30
-(`ZD2228PZYT`) after the Step 1 commits: process alive, no `FATAL`, no
-`AndroidRuntime` crash, no overflow in `logcat`. The device detached from `adb`
-before the per-screen walkthrough was finished, so **the Step 1 fixes are
-verified as "the app starts and logs nothing bad", not yet as "a person
-confirmed each of the five surfaces by eye."** That walkthrough is still owed.
-
 A passing suite has missed a startup crash, a permanent spinner and three
-keyboard failures in this project. Launching the app remains non-optional.
+keyboard failures in this project, so every Step 1 fix was confirmed by eye on
+a running device, not by test output alone.
+
+Run on the Pixel 7 emulator (API 36, 1080×2400 at 420 dpi), full first-launch
+journey: welcome → sign-up → 9 onboarding steps → permissions → dashboard.
+The physical Moto Edge 30 took the first build and launched clean (process
+alive, no `FATAL`, no `AndroidRuntime`, no overflow in `logcat`) but detached
+from `adb` before the walkthrough, so the per-screen confirmation below is the
+emulator's.
+
+| Fix | Confirmed on device |
+|---|---|
+| D1 | Avatar reads **"OM"** beside "Ojasvi" — the name typed in onboarding. No "AM" anywhere |
+| D2 | All five tabs visible and legible; the FAB sits clear at the right and covers no destination |
+| D3 | The Quick Log sheet shows **all eight** items including "Log Measurement", with room to spare and no overflow stripes |
+| D4 | `dumpsys package` reports `android.permission.POST_NOTIFICATIONS: granted=false, USER_SENSITIVE` — Android now treats it as requestable, which is what the missing declaration blocked |
+| D6 | Macro rows render without stripes at every width walked |
+| C1 | The greeting read "Good morning, Ojasvi" at 11:45 and dated itself "Thursday, October 1" — both from the clock |
+
+Also confirmed: the sign-up form raised the keyboard on both fields and the
+onboarding details form on all four, so the Phase 5 `FocusNode` fixes hold; no
+spinner hung; nothing was pre-filled with another identity.
+
+### Two things found during the walkthrough
+
+**N1 — the onboarding "Enable Notifications" button is a stub.** It shows a
+snackbar reading *"System permission dialog would appear here."* and never
+calls the scheduler
+([onboarding_screen.dart:383](../lib/screens/auth/onboarding_screen.dart#L383)).
+The D4 manifest fix is still required and verified, but **this button cannot
+grant anything**, so a user who taps it gets a reassuring message and no
+permission. Pre-existing; not introduced by this work.
+
+**N2 — not a defect, recorded so it is not re-investigated.** The dashboard
+first showed 1088 kcal of food on a profile that had logged nothing. The cause
+was a *previous install's* snapshot on the same emulator (`revision 20`,
+`savedAt` an hour before the run), which hydration correctly restored. After
+`pm clear` the app returns to a clean welcome screen. Local-first persistence
+behaving as designed — **not** reseeded sample data.
