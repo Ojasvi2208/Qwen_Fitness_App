@@ -10,53 +10,70 @@ Continue the PULSE Flutter app at
 **Read first, in this order:**
 1. `CLAUDE.md` — environment, gate, style rules, idioms
 2. `docs/SESSION_HANDOFF.md` — where the last session stopped
-3. `docs/PHASE7_QA_AUTOMATION_PLAN.md` — the plan you are executing
+3. `docs/PHASE7_REMEDIATION_PLAN.md` — **the plan you are executing**
+4. `docs/QA_FINDINGS.md` — the evidence behind it
 
-State at handoff: `flutter analyze` 0 errors, `flutter test` 235/235, Android
-toolchain green, Pixel 7 emulator and a physical Moto Edge 30 both working,
-18 commits on `origin/master`.
+State at handoff: `flutter analyze` 0 errors, `flutter test` 273 passing and
+160 skipped, Android toolchain green, Pixel 7 emulator working, 25 commits on
+`master` of which 7 are unpushed. Phase 7 Steps 1 and 2 are complete; Step 3
+has not started.
 
-**Execute the Phase 7 plan in its stated order. Do not reorder it** — the
-golden harness exists specifically so the responsive refactor can be proven
-safe, so Step 3 must not precede Step 2.
+**This is a utility, not a demo.** The guiding standard all session has been
+that every number the app shows must be one it actually computed or recorded.
+Four defects were fixed on exactly that basis, and the daily plan is now
+derived from the user's own body rather than displayed as a constant. Hold that
+line.
 
-- **Step 1** — fix defects D1–D5 and code-quality items C1 and C4. These are
-  user-visible falsehoods: an avatar reading "AM" beside the name "Ojasvi",
-  a FAB covering the Train tab, a sheet overflowing by 176 px, a notification
-  permission that cannot be granted, and hard-coded step/calorie figures
-  presented as the user's own.
-- **Step 2** — build the golden-image harness across the device matrix in §2.1.
-  Expect it to surface more overflows than the five already known. That is the
-  point; log each and fix in Step 3.
-- **Step 3** — the responsive refactor (D5), then C2, C3 and C5.
-- **Steps 4–5** — the integration suite and the Tier 1–3 flow cases.
-- **Step 6** — write `docs/QA_FINDINGS.md`.
+**Execute `PHASE7_REMEDIATION_PLAN.md` in its stated order. Do not reorder it.**
 
-C6 (13 warnings, ~239 info lints) may be swept at any point, in its own commit.
+- **Step 3a** — the nine overflow sites O1–O9. **O6 first and alone**: it is the
+  shared `PrimaryButton`, so fixing it may clear failures currently counted
+  against other screens. Re-run the sweep and re-count before touching anything
+  else. O1+O2 are one fix (`ListTile` gives `title` and `trailing` no shared
+  width budget). O5 fails on the tablet too, so it must wrap, not shrink.
+- **Step 3b** — the systemic half of D5: 39 fixed `fontSize:`, 31 hard-coded
+  dimensions, `PulseBreakpoints` unused.
+- **Step 3c** — C2 magic numbers, C3 duplicated literals, C5 force-unwraps.
+- **Steps 4–6** — integration suite, Tier 1–3 cases, final report.
+
+```bash
+flutter test --run-skipped test/golden   # 117/160 passing — the count must rise
+```
 
 **Non-negotiable constraints:**
-- Match the original author's style exactly. `CLAUDE.md` has the full guide:
-  `═`-boxed file banners, `// ──` dividers, comments that say *why* and cite
-  the brief (`§NN`), `Pulse*` prefixes, role suffixes, `k`-prefixed constants,
-  hand-written test doubles, no `copyWith`, never a `_build*` helper.
 - The gate is **zero analyzer errors and a fully passing suite**, verified at
   every commit. Paste real console output; never claim a pass without it.
-- **A green suite does not mean the app works.** It missed a startup crash, a
-  permanent spinner and three keyboard failures in one session. Launch the app
-  on the emulator or the Moto device before calling any UI work done.
+- **A green suite does not mean the app works.** It has missed a startup crash,
+  a permanent spinner and three keyboard failures in this project. Launch on
+  the emulator before calling any UI work done.
+- Match the original author's style exactly — `CLAUDE.md` has the full guide.
+  **Never run `dart format`**; it reflows the whole file.
 - Never reintroduce seeded user data. Empty states are the pattern.
 - Commit messages: plain prose, no `Co-Authored-By`, no mention of any AI tool.
 
 **Traps that cost time last session:**
-- Autosave is debounced — a test that mutates then reboots must
-  `await store.flushPendingSave()` first.
-- `PulseStore()` is zero-arg; persistence attaches via `attachPersistence`.
-- `adb screencap` returns black frames on the Moto Edge 30; use the
-  `integration_test` screenshot API.
+- `flutter` is **not on `PATH`** in a fresh shell — `export
+  PATH="$HOME/development/flutter/bin:$PATH"` first, every time.
+- **Clear app data between onboarding runs** (`adb shell pm clear
+  com.pulse.pulse_app`) or a previous install's snapshot hydrates into what
+  looks like a fresh profile. This cost a full investigation.
+- `adb input text` breaks on a literal space — use `%s`.
+- `adb screencap` is black on the Moto Edge 30 but fine on the emulator.
+- In zsh, `D="-s emulator-5554"; adb $D ...` does not expand.
+- Autosave is debounced — `await store.flushPendingSave()` before `bootFresh`.
+- `PulseStore()` is zero-arg; `PulseApp` takes `store`, not `initialRoute`.
 - graphify runs under Python 3.14, not the shell's `python3`.
 
-**Also outstanding:** `master` is ~7 commits ahead of `main` and `gh` is not
+**Three decisions are owed by the owner before some work can finish** — raise
+them early rather than guessing:
+1. The eight fabricated screens (QA_FINDINGS §3) — store-wire or empty-state?
+2. N1 — the onboarding "Enable Notifications" button is a stub that can grant
+   nothing. Wire it or remove it?
+3. Golden images stay uncommitted until 1 and 2 are settled, or a later honest
+   fix will read as a regression.
+
+**Also outstanding:** `master` is 7 commits ahead of `main` and `gh` is not
 authenticated, so the PR needs a browser or `gh auth login`.
 
-Stop and check in after Step 2, so the golden baseline can be reviewed before
-the refactor churns it.
+Work through Step 3a and check in after O6 and its re-count, so the shared-
+component effect can be reviewed before the remaining eight sites are touched.
