@@ -42,7 +42,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _steps = 9;
 
+  /// §14 — the details step is the only source of the user's body, and
+  /// every target is computed from it. Advancing past it empty stored a
+  /// 0 kg weight and showed it back as fact on the next screen, so the
+  /// step now names what is missing instead of accepting nothing.
+  String? get _detailsError {
+    if (_step != 2) return null;
+    if (_name.text.trim().isEmpty) return 'Add your name so the app knows who it is for.';
+    final age = int.tryParse(_age.text);
+    if (age == null || age < kMinAgeYears || age > kMaxAgeYears) {
+      return 'Enter an age between $kMinAgeYears and $kMaxAgeYears.';
+    }
+    final height = double.tryParse(_height.text);
+    if (height == null || height < kMinHeightCm || height > kMaxHeightCm) {
+      return 'Enter a height between ${kMinHeightCm.round()} and ${kMaxHeightCm.round()} cm.';
+    }
+    final weight = double.tryParse(_weight.text);
+    if (weight == null || weight < kMinWeightKg || weight > kMaxWeightKg) {
+      return 'Enter a weight between ${kMinWeightKg.round()} and ${kMaxWeightKg.round()} kg.';
+    }
+    return null;
+  }
+
   void _next() {
+    final blocked = _detailsError;
+    if (blocked != null) {
+      // Honest and specific, never shaming (§85).
+      pulseSnack(context, blocked, icon: Icons.edit_outlined);
+      return;
+    }
     HapticFeedback.lightImpact();
     _releaseFocus();
     if (_step == 8) {
@@ -108,7 +136,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_step >= _steps) return _PermissionsFlow(onFinish: () => Navigator.of(context).pushNamedAndRemoveUntil('/home', (r) => false));
-    return Scaffold(
+    // §14: the system back gesture popped the whole route and threw away
+    // every answer given so far — nine steps of work gone, with no warning
+    // and no way back. Back now means "previous step", and only leaves
+    // onboarding from the first one.
+    return PopScope(
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Column(children: [
           // Progress header — StepIndicator/Onboarding
@@ -143,6 +180,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: PrimaryButton(label: _step == 8 ? 'Start My Plan' : 'Continue', onTap: _next),
           ),
         ]),
+        ),
       ),
     );
   }

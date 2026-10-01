@@ -894,9 +894,18 @@ class MetricStat extends StatelessWidget {
   final IconData? icon;
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // §2.1: an uppercased label is wider than the same text in
+        // sentence case, and this one is caller-supplied. The overflow
+        // sweep never saw it because it renders empty screens — this
+        // surfaced only once a step was filled in.
         Row(children: [
           if (icon != null) ...[Icon(icon, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)), const SizedBox(width: 4)],
-          Text(label.toUpperCase(), style: Theme.of(context).textTheme.labelMedium),
+          Flexible(
+            child: Text(label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium),
+          ),
         ]),
         const SizedBox(height: 2),
         Text(value, style: PulseTypography.metricSmall.copyWith(color: Theme.of(context).colorScheme.onSurface)),

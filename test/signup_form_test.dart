@@ -183,6 +183,12 @@ void _onboardingTests() {
       await tester.pumpWidget(_onboardingHost(PulseStore()));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).at(0), 'Priya');
+      // §14: the details step now refuses to advance while it is
+      // incomplete, so the rest is filled in to reach the navigation this
+      // case is actually about.
+      await tester.enterText(find.byType(TextField).at(1), '34');
+      await tester.enterText(find.byType(TextField).at(2), '165');
+      await tester.enterText(find.byType(TextField).at(3), '62');
       await tester.pumpAndSettle();
 
       // Forward then back: the step subtree is rebuilt in the same slot,
