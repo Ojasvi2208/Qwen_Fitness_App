@@ -40,8 +40,11 @@ class _TodayScreenState extends State<TodayScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future.delayed(const Duration(milliseconds: 800));
-          pulseSnack(context, 'Synced with Apple Health · steps and workouts up to date.');
+          // v1: there is no health integration, so a refresh re-reads what
+          // is already on this device. It must not claim a sync that no
+          // code performs (§3 honesty rule).
+          await Future.delayed(const Duration(milliseconds: 300));
+          store.rolloverIfNeeded();
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, 120),

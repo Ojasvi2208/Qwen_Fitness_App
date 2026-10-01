@@ -21,7 +21,7 @@ class _PaywallSheetState extends State<PaywallSheet> {
   int _plan = 1; // default yearly (better value, honestly labelled)
   static const _benefits = <({IconData icon, String title, String body})>[
     (icon: Icons.insights_rounded, title: 'Advanced nutrition insights', body: 'Macro trends, nutrient breakdowns and pattern detection.'),
-    (icon: Icons.qr_code_scanner_rounded, title: 'Barcode scanning', body: 'Log packaged foods in seconds from a huge product database.'),
+
     (icon: Icons.photo_camera_rounded, title: 'AI meal recognition', body: 'Photograph a plate — review the estimate, then log.'),
     (icon: Icons.mic_rounded, title: 'Voice logging', body: '“Two eggs and toast” becomes a logged breakfast.'),
     (icon: Icons.query_stats_rounded, title: 'Advanced progress reports', body: 'Weekly deep-dives on nutrition, activity and weight.'),

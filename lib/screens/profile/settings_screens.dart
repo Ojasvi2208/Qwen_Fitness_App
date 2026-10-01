@@ -286,8 +286,10 @@ class ConnectedAppsScreen extends StatefulWidget {
 
 class _ConnectedAppsScreenState extends State<ConnectedAppsScreen> {
   late final Map<String, ({bool connected, String detail, IconData icon})> _apps = {
-    'Apple Health': (connected: true, detail: 'Steps, workouts, weight · synced 4 min ago', icon: Icons.health_and_safety_rounded),
-    'Apple Watch': (connected: true, detail: 'Heart rate, workout sessions', icon: Icons.watch_rounded),
+    // v1 ships no health integration at all, so nothing here is connected
+    // and none of these may report a sync time (§3).
+    'Apple Health': (connected: false, detail: 'Not available yet', icon: Icons.health_and_safety_rounded),
+    'Apple Watch': (connected: false, detail: 'Not available yet', icon: Icons.watch_rounded),
     'Health Connect': (connected: false, detail: 'Android health data (steps, sleep)', icon: Icons.monitor_heart_rounded),
     'Fitbit': (connected: false, detail: 'Steps, sleep, cardio sessions', icon: Icons.show_chart_rounded),
     'Garmin': (connected: false, detail: 'Runs, rides, training load', icon: Icons.hiking_rounded),
