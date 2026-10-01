@@ -73,6 +73,9 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
       }
       await _store.attachPersistence(repo,
           reminderScheduler: kUsePlatformServices ? _scheduler() : null);
+      // §3: a snapshot can be days old. File whatever day it describes
+      // before any screen reads today's figures as current.
+      _store.rolloverIfNeeded();
     } catch (e) {
       // Persistence failure must never block the app (§74 error posture).
       debugPrint('PULSE persistence unavailable: $e');
@@ -109,6 +112,9 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
     // entitlements (and ad visibility) are correct without waiting for a tap.
     if (state == AppLifecycleState.resumed) {
       _store.settleSubscription();
+      // §3: the app is routinely left open across midnight — roll the
+      // day over on resume so today's figures are actually today's.
+      _store.rolloverIfNeeded();
     }
   }
 
@@ -342,7 +348,10 @@ class _PulseShellState extends State<PulseShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _tab, children: pages),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      // D2: centerDocked over a five-destination NavigationBar put the FAB on
+      // top of the middle tab — Train — hiding its icon and label. endFloat
+      // keeps all five tabs reachable; the bar's own padding clears the FAB.
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: FloatingActionButton(

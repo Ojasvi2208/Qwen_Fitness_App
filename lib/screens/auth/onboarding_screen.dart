@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import '../../data/energy_plan.dart';
+import '../../data/pulse_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pulse_components.dart';
@@ -72,7 +74,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       heightCm: double.tryParse(_height.text),
       startWeightKg: weight,
     );
-    store.setTargets(targetWeightKg: _targetWeight);
+    // N3: setTargets could only ever write calories and protein — there
+    // were no carb or fat parameters — so the store's defaults survived
+    // onboarding and the comment above them claiming otherwise was false.
+    // updateGoals is the only path that writes all of them.
+    final plan = _plan;
+    store.updateGoals((g) {
+      g.calorieGoal = plan.calorieGoal;
+      g.proteinGoal = plan.proteinGoal;
+      g.carbGoal = plan.carbGoal;
+      g.fatGoal = plan.fatGoal;
+      g.waterGoalLiters = plan.waterGoalLiters;
+      g.stepGoal = plan.stepGoal;
+      g.targetWeightKg = _targetWeight;
+    });
     // First weigh-in: seeds the trend from the user's own entry.
     if (weight != null) store.logWeight(weight);
   }
@@ -277,7 +292,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           OptionTile(title: d, selected: _diet == d, onTap: () => setState(() => _diet = d)),
       ]);
 
+  /// N3: the plan page used to show 2,050 kcal and its macros as literals
+  /// while claiming "Built from your answers". Both the page and the
+  /// commit now read this, so what the user is shown is what is stored.
+  PulseEnergyPlan get _plan => PulseEnergyPlan.from(
+        sex: _sex == 'Male' ? BiologicalSex.male : BiologicalSex.female,
+        ageYears: int.tryParse(_age.text) ?? 30,
+        heightCm: double.tryParse(_height.text) ?? 170,
+        weightKg: double.tryParse(_weight.text) ?? 70,
+        activity: ActivityLevel.values[_activity.clamp(0, 3)],
+        pace: WeightPace.values[_pace.clamp(0, 2)],
+        targetWeightKg: _targetWeight,
+      );
+
   Widget _planPage(BuildContext c) {
+    final plan = _plan;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _heading(c, 'Your daily plan is ready',
           'Built from your answers — ${goals.join(", ").toLowerCase()}. Every number below stays editable in My Goals.'),
@@ -286,10 +315,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Daily Calories', style: Theme.of(c).textTheme.titleMedium),
-            Text('2,050 kcal', style: PulseTypography.metricMedium.copyWith(color: Theme.of(c).colorScheme.primary)),
+            Text('${plan.calorieGoal.toStringAsFixed(0)} kcal', style: PulseTypography.metricMedium.copyWith(color: Theme.of(c).colorScheme.primary)),
           ]),
           const Divider(height: PulseSpacing.xl),
-          for (final m in [('Protein', '135 g', PulseColors.protein, Icons.bolt_rounded), ('Carbs', '220 g', PulseColors.carbs, Icons.grain_rounded), ('Fat', '70 g', PulseColors.fat, Icons.water_drop_rounded)])
+          for (final m in [
+            ('Protein', '${plan.proteinGoal.toStringAsFixed(0)} g', PulseColors.protein, Icons.bolt_rounded),
+            ('Carbs', '${plan.carbGoal.toStringAsFixed(0)} g', PulseColors.carbs, Icons.grain_rounded),
+            ('Fat', '${plan.fatGoal.toStringAsFixed(0)} g', PulseColors.fat, Icons.water_drop_rounded),
+          ])
             Padding(
               padding: const EdgeInsets.symmetric(vertical: PulseSpacing.sm),
               child: Row(children: [
@@ -303,17 +336,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const Icon(Icons.water_drop_rounded, size: 18, color: PulseColors.water),
             const SizedBox(width: PulseSpacing.s),
             Expanded(child: Text('Water', style: Theme.of(c).textTheme.bodyLarge)),
-            Text('2.6 L', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
+            Text('${plan.waterGoalLiters.toStringAsFixed(1)} L', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
           ]),
           const SizedBox(height: PulseSpacing.sm),
           Row(children: [
             const Icon(Icons.directions_walk_rounded, size: 18, color: PulseColors.steps),
             const SizedBox(width: PulseSpacing.s),
             Expanded(child: Text('Steps', style: Theme.of(c).textTheme.bodyLarge)),
-            Text('8,000', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
+            Text('${plan.stepGoal}', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
           ]),
         ]),
       ),
+      // The pace the user picked could not be met safely, so say so
+      // rather than showing a capped number as if it were what they chose.
+      if (plan.floorNote != null) ...[
+        const SizedBox(height: PulseSpacing.m),
+        Container(
+          padding: const EdgeInsets.all(PulseSpacing.m),
+          decoration: BoxDecoration(
+              color: Theme.of(c).colorScheme.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(PulseRadius.m)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.info_outline_rounded, size: 18, color: Theme.of(c).colorScheme.primary),
+            const SizedBox(width: PulseSpacing.s),
+            Expanded(child: Text(plan.floorNote!, style: Theme.of(c).textTheme.bodySmall?.copyWith(fontSize: 13.5, height: 1.45))),
+          ]),
+        ),
+      ],
       const SizedBox(height: PulseSpacing.l),
       SecondaryButton(label: 'Adjust Goals', icon: Icons.tune_rounded, onTap: () => Navigator.of(c).pushNamed('/goals')),
       const SizedBox(height: PulseSpacing.s),
@@ -330,9 +379,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 // ── §15 Permissions — requested contextually, one at a time ────────
-class _PermissionsFlow extends StatelessWidget {
+class _PermissionsFlow extends StatefulWidget {
   const _PermissionsFlow({required this.onFinish});
   final VoidCallback onFinish;
+
+  @override
+  State<_PermissionsFlow> createState() => _PermissionsFlowState();
+}
+
+class _PermissionsFlowState extends State<_PermissionsFlow> {
+  /// N1 §15: the notification button was a stub that showed "System
+  /// permission dialog would appear here" and could grant nothing. It
+  /// now calls the real scheduler seam, and this records what the OS
+  /// actually answered so the card can stop claiming otherwise.
+  bool _notificationsAsked = false;
+  bool _notificationsGranted = false;
+
+  Future<void> _requestNotifications() async {
+    final store = PulseStore.of(context);
+    var granted = false;
+    try {
+      granted = await store.reminders.ensurePermission();
+    } catch (_) {
+      // A permission request that fails is a denied permission, never a
+      // crashed onboarding (§74 error posture).
+      granted = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _notificationsAsked = true;
+      _notificationsGranted = granted;
+    });
+    pulseSnack(
+        context,
+        granted
+            ? 'Reminders are on. Change them anytime in Settings.'
+            : 'Notifications stay off. You can turn them on in Settings whenever you like.',
+        icon: granted ? Icons.notifications_active_rounded : Icons.notifications_off_rounded);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,17 +430,22 @@ class _PermissionsFlow extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: PulseSpacing.xl),
           _perm(context, Icons.health_and_safety_rounded, PulseColors.success, 'Connect your health data',
-              'Automatically bring your steps, workouts and other activity into PULSE.', 'Connect Apple Health', 'Connect Health Connect'),
+              'Automatically bring your steps, workouts and other activity into PULSE.', 'Connect Apple Health', androidLabel: 'Connect Health Connect'),
           _perm(context, Icons.notifications_rounded, PulseColors.info, 'Daily reminders',
-              'Water nudges and workout reminders — encouraging, never guilt-based. You choose every time.', 'Enable Notifications'),
+              'Water nudges and workout reminders — encouraging, never guilt-based. You choose every time.',
+              _notificationsAsked
+                  ? (_notificationsGranted ? 'Notifications enabled' : 'Notifications are off')
+                  : 'Enable Notifications',
+              onRequest: _requestNotifications,
+              done: _notificationsAsked),
           _perm(context, Icons.photo_camera_rounded, PulseColors.accent, 'Camera',
               'Only used when you scan a barcode or photograph a meal. Photos aren\'t stored unless you log them.', 'Allow Camera'),
           _perm(context, Icons.location_on_rounded, PulseColors.fat, 'Location (optional)',
               'Used only for mapping outdoor runs and rides while tracking. Never tracked in the background.', 'Allow While Using App'),
           const SizedBox(height: PulseSpacing.l),
-          PrimaryButton(label: 'Done — take me to my dashboard', onTap: onFinish),
+          PrimaryButton(label: 'Done — take me to my dashboard', onTap: widget.onFinish),
           const SizedBox(height: PulseSpacing.s),
-          Center(child: TextButton(onPressed: onFinish, child: const Text('Maybe Later'))),
+          Center(child: TextButton(onPressed: widget.onFinish, child: const Text('Maybe Later'))),
           SizedBox(height: MediaQuery.sizeOf(context).height * 0.06),
           Center(child: Text('Skip anything — the app works fully without it.', style: Theme.of(context).textTheme.labelMedium)),
         ]),
@@ -364,7 +453,14 @@ class _PermissionsFlow extends StatelessWidget {
     );
   }
 
-  Widget _perm(BuildContext c, IconData icon, Color color, String title, String body, String primaryLabel, [String? androidLabel]) =>
+  /// [onRequest] is supplied only where a real permission call exists
+  /// behind a seam; the others state plainly that they are requested in
+  /// context rather than pretending to open a dialog they cannot.
+  Widget _perm(BuildContext c, IconData icon, Color color, String title,
+          String body, String primaryLabel,
+          {String? androidLabel,
+          Future<void> Function()? onRequest,
+          bool done = false}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: PulseSpacing.m),
         child: PulseCard(
@@ -380,10 +476,14 @@ class _PermissionsFlow extends StatelessWidget {
                 const SizedBox(height: PulseSpacing.sm),
                 Wrap(spacing: PulseSpacing.s, children: [
                   FilledButton.tonal(
-                      onPressed: () => pulseSnack(c, 'System permission dialog would appear here.'),
+                      onPressed: done
+                          ? null
+                          : onRequest ??
+                              () => pulseSnack(c,
+                                  'PULSE asks for this the first time you use it — nothing is requested now.'),
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                       child: Text(androidLabel != null ? '$primaryLabel · $androidLabel' : primaryLabel)),
-                  TextButton(onPressed: () {}, child: const Text('Maybe Later')),
+                  if (!done) TextButton(onPressed: widget.onFinish, child: const Text('Maybe Later')),
                 ]),
               ]),
             ),

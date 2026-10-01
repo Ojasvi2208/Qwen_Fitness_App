@@ -16,8 +16,11 @@ No SDK ships with this repo. On this machine:
   build-tools 36.0.0), `ANDROID_HOME` set in `~/.zshrc`. `flutter doctor` is
   green for Android. Emulator AVD: `pulse_pixel7` (API 36, Play Store image —
   Ads and In-App Purchase need Play Services).
-- **Xcode is NOT installed** and cannot be from a terminal (App Store only,
-  needs an Apple ID and `sudo`). All iOS work is unverified.
+- **Xcode IS installed** and its licence is signed (2026-10-01). iOS simulators
+  (18.4, 27.0) are installed and `flutter devices` sees them. **CocoaPods is
+  not installed**, so iOS plugin builds will fail until `brew install cocoapods`
+  — this app has three native plugins. All iOS work remains unverified; v1 is
+  Android only.
 - **graphify** lives under Python 3.14 (`/opt/homebrew/opt/python@3.14/bin/python3.14`),
   *not* the shell's aliased `python3` (3.11). Checking its deps under 3.11
   falsely reports everything missing — do not "fix" that. `graphify-out/` is
@@ -104,6 +107,13 @@ Screens must therefore survive empty collections — no unguarded `.first`,
 Plain prose matching the existing log. **Never** a `Co-Authored-By` trailer, and
 never a mention of Claude, Anthropic or any other AI tool. Explain *why*, not
 just what.
+
+## Next work
+
+[docs/PHASE7_QA_AUTOMATION_PLAN.md](docs/PHASE7_QA_AUTOMATION_PLAN.md) is the
+current plan: five verified UI defects (D1–D5), a golden-image layer to catch
+overflow and overstretch, and an integration suite for the critical journeys.
+[docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md) has the full state.
 
 ## Phase 6
 

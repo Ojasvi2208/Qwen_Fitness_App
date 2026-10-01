@@ -49,3 +49,9 @@ app.*.map.json
 
 # graphify knowledge graph — regenerable in seconds via `graphify update .`
 graphify-out/
+
+# Release signing (C7) — never commit. Losing these means the app can never
+# be updated on Play Store; committing them means anyone can sign as you.
+android/key.properties
+**/*.jks
+**/*.keystore

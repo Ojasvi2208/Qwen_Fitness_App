@@ -326,39 +326,73 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 // ── §55 Notification center ────────────────────────────────────────
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    // §3: this listed five delivered notifications — "You've completed 20
+    // workouts" among them — and nothing in the app has ever recorded a
+    // delivery. What the store genuinely knows is which reminders are
+    // scheduled, so that is what this screen now shows.
+    final reminders = store.reminders.book.all;
+
     return PulseScaffold(
       title: 'Notifications',
-      actions: [TextButton(onPressed: () => pulseSnack(context, 'All marked as read.'), child: const Text('Mark all read'))],
-      body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        for (final n in const [
-          ('Hydration reminder', 'You\'re 700 ml away from today\'s water goal.', Icons.water_drop_rounded, PulseColors.water, '2:15 PM', true),
-          ('Workout reminder', 'Upper Body Strength is planned for 6:30 PM.', Icons.fitness_center_rounded, PulseColors.exercise, '1:00 PM', true),
-          ('Weekly summary', 'Your weekly report is ready.', Icons.newspaper_rounded, PulseColors.info, 'Mon 8:00 AM', false),
-          ('Goal milestone', 'You\'ve completed 20 workouts.', Icons.emoji_events_rounded, PulseColors.secondary, 'Sun', false),
-          ('Insight', 'Protein goal reached on 5 of the last 7 days.', Icons.lightbulb_rounded, PulseColors.accent, 'Sat', false),
-        ])
-          Card(
-            color: n.$6 ? scheme.primary.withOpacity(0.05) : null,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: 6),
-              leading: CircleAvatar(backgroundColor: (n.$4 as Color).withOpacity(0.13),
-                  child: Icon(n.$3, color: n.$4, size: 19)),
-              title: Text(n.$1, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: n.$6 ? FontWeight.w700 : FontWeight.w600)),
-              subtitle: Text(n.$2, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14)),
-              trailing: Text(n.$5, style: Theme.of(context).textTheme.labelSmall),
-              onTap: () => pulseSnack(context, 'Opened: ${n.$1}', icon: Icons.notifications_active_rounded),
-            ),
-          ),
-        const SizedBox(height: PulseSpacing.m),
-        SecondaryButton(label: 'Notification Settings', icon: Icons.tune_rounded,
-            onTap: () => Navigator.of(context).pushNamed('/notification-settings')),
-        const SizedBox(height: PulseSpacing.s),
-        Text('PULSE reminders are supportive by design — they tell you what\'s left, never what you "failed".',
-            style: Theme.of(context).textTheme.bodySmall),
-      ]),
+      subtitle: 'The reminders you have scheduled',
+      body: reminders.isEmpty
+          ? EmptyState(
+              icon: Icons.notifications_none_rounded,
+              title: 'No reminders set',
+              body: 'Reminders you schedule will be listed here, with the time '
+                  'each one is due.',
+              actionLabel: 'Notification Settings',
+              onAction: () => Navigator.of(context).pushNamed('/notification-settings'),
+            )
+          : ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
+              if (!store.reminders.permissionGranted)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: PulseSpacing.m),
+                  child: Container(
+                    padding: const EdgeInsets.all(PulseSpacing.m),
+                    decoration: BoxDecoration(
+                        color: PulseColors.warning.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(PulseRadius.m)),
+                    child: Row(children: [
+                      const Icon(Icons.info_outline_rounded, size: 20, color: PulseColors.warning),
+                      const SizedBox(width: PulseSpacing.sm),
+                      // Honest: a scheduled reminder without permission
+                      // will not actually arrive, and the user should know.
+                      Expanded(child: Text(
+                          'Notifications are turned off for PULSE, so these will not arrive until you allow them.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13.5))),
+                    ]),
+                  ),
+                ),
+              for (final r in reminders)
+                Card(
+                  color: r.enabled ? scheme.primary.withOpacity(0.05) : null,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: 6),
+                    leading: CircleAvatar(
+                        backgroundColor: PulseColors.water.withOpacity(0.13),
+                        child: const Icon(Icons.alarm_rounded, color: PulseColors.water, size: 19)),
+                    title: Text(r.title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: r.enabled ? FontWeight.w700 : FontWeight.w600)),
+                    subtitle: Text(r.body, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14)),
+                    trailing: Text(r.enabled ? r.timeLabel : 'Off',
+                        style: Theme.of(context).textTheme.labelSmall),
+                    onTap: () => Navigator.of(context).pushNamed('/notification-settings'),
+                  ),
+                ),
+              const SizedBox(height: PulseSpacing.m),
+              SecondaryButton(label: 'Notification Settings', icon: Icons.tune_rounded,
+                  onTap: () => Navigator.of(context).pushNamed('/notification-settings')),
+              const SizedBox(height: PulseSpacing.s),
+              Text('PULSE reminders are supportive by design — they tell you what\'s left, never what you "failed".',
+                  style: Theme.of(context).textTheme.bodySmall),
+            ]),
     );
   }
 }

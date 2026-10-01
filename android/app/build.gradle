@@ -5,6 +5,19 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// C7 — release signing. The keystore and its passwords live outside the repo
+// in android/key.properties, which is gitignored: committing them would let
+// anyone sign as this app, and losing them means it can never be updated on
+// Play Store again. A missing file is not an error here, so debug builds and
+// a fresh clone still work; only a release build requires it.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader("UTF-8") { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace = "com.pulse.pulse_app"
     compileSdk = flutter.compileSdkVersion
@@ -33,11 +46,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            // Falls back to debug signing only when key.properties is absent,
+            // so a clone without the keystore still builds. A real release
+            // must use the release config — Play rejects a debug-signed
+            // artifact outright.
+            signingConfig = keystorePropertiesFile.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
         }
     }
 }

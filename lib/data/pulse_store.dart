@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'consistency_service.dart';
+import 'day_archive.dart';
 import 'measurements.dart';
 import 'monetization.dart';
 import 'nutrition_service.dart';
@@ -131,8 +132,12 @@ class PulseStore extends ChangeNotifier {
   /// route: no profile yet → onboarding rather than the dashboard.
   bool get hasProfile => userName.isNotEmpty;
 
-  /// Default targets shown while the goal step is still open; onboarding
-  /// overwrites them from the user's own details (§14 step 9).
+  /// Starting targets, held only until onboarding computes the user's own
+  /// from their details (§14 step 9, see energy_plan.dart). Generic on
+  /// purpose: they are what a profile-less install shows, never a claim
+  /// about anybody. The previous comment here said onboarding overwrote
+  /// them, which was false until N3 was fixed — setTargets had no carb or
+  /// fat parameter at all, so these survived the whole flow.
   final Goals goals = Goals(
     calorieGoal: 2000, proteinGoal: 120, carbGoal: 200, fatGoal: 65,
     waterGoalLiters: 2.5, stepGoal: 8000, targetWeightKg: 0, workoutsPerWeek: 3,
@@ -145,6 +150,22 @@ class PulseStore extends ChangeNotifier {
   double stepsToday = 0;
   double waterLogged = 0;
   int workoutsCompletedToday = 0;
+
+  /// ── §3 Daily history ────────────────────────────────────────────
+  /// The scalars above are *today's*. Seven screens claimed a history
+  /// that nothing recorded, and nothing ever reset them either — steps
+  /// accumulated across calendar days forever. [rolloverIfNeeded] files
+  /// the finished day here and starts the next one empty.
+  final DayArchive archive = DayArchive();
+
+  /// The calendar day the scalars above describe, so a rollover happens
+  /// once and only when the date actually changes.
+  String _currentDay = '';
+
+  /// §3: each logged drink, not just the running total. The water screen
+  /// listed five invented rows with working delete buttons; [waterLogged]
+  /// is now derived from these.
+  final List<WaterSip> sips = [];
 
   /// ── WP3.5 Reminders (§58/§64) ───────────────────────────────────
   /// Models persist in the snapshot; OS scheduling lives behind the
@@ -402,9 +423,62 @@ class PulseStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addWater(double liters) {
-    waterLogged = (waterLogged + liters).clamp(0.0, 10.0);
+  void addWater(double liters) => logSip(liters);
+
+  /// §3: records the drink itself. The total is recomputed from the
+  /// sips so the list and the figure can never disagree.
+  void logSip(double liters, {DateTime? now}) {
+    sips.add(WaterSip(at: now ?? DateTime.now(), liters: liters));
+    _recomputeWater();
     track('water_logged');
+    _markDirty();
+    notifyListeners();
+  }
+
+  /// §3: the delete button the fabricated rows already offered, now
+  /// acting on a real entry.
+  void removeSip(WaterSip sip) {
+    sips.remove(sip);
+    _recomputeWater();
+    track('water_removed');
+    _markDirty();
+    notifyListeners();
+  }
+
+  void _recomputeWater() =>
+      waterLogged = sips.fold(0.0, (sum, s) => sum + s.liters).clamp(0.0, 10.0);
+
+  /// ── §3 Day rollover ─────────────────────────────────────────────
+  /// Files today into the archive and starts the next day empty. Called
+  /// on boot and on resume; the clock is injectable so a test can cross
+  /// midnight without waiting for it.
+  void rolloverIfNeeded({DateTime? now}) {
+    final today = pulseDayKey(now ?? DateTime.now());
+    if (_currentDay.isEmpty) {
+      // First boot, or a snapshot written before the archive existed:
+      // adopt today rather than archiving a day we cannot date.
+      _currentDay = today;
+      return;
+    }
+    if (_currentDay == today) return;
+
+    archive.record(DayRecord(
+      date: _currentDay,
+      steps: stepsToday,
+      waterLiters: waterLogged,
+      kcal: foodKcal,
+      protein: protein,
+      workouts: workoutsCompletedToday,
+      logged: hasAnyData,
+    ));
+
+    diary.clear();
+    sips.clear();
+    waterLogged = 0;
+    stepsToday = 0;
+    activityCaloriesBurned = 0;
+    workoutsCompletedToday = 0;
+    _currentDay = today;
     _markDirty();
     notifyListeners();
   }
@@ -649,6 +723,22 @@ class PulseStore extends ChangeNotifier {
     }
 
     waterLogged = (s['water'] as num?)?.toDouble() ?? waterLogged;
+    // §3: snapshots written before the archive existed carry neither key
+    // — they hydrate to an empty history and adopt today, never crash.
+    if (s['sips'] is List) {
+      sips.clear();
+      for (final row in s['sips'] as List) {
+        if (row is Map) sips.add(WaterSip.fromJson(row.cast<String, dynamic>()));
+      }
+      _recomputeWater();
+    }
+    if (s['archive'] is List) {
+      archive.clear();
+      for (final d in DayArchive.fromJson(s['archive']).days) {
+        archive.record(d);
+      }
+    }
+    _currentDay = s['day'] is String ? s['day'] as String : '';
     stepsToday = (s['steps'] as num?)?.toDouble() ?? stepsToday;
     activityCaloriesBurned =
         (s['activityKcal'] as num?)?.toDouble() ?? activityCaloriesBurned;
@@ -740,6 +830,9 @@ class PulseStore extends ChangeNotifier {
           for (final r in weights) {'date': r.date.toIso8601String(), 'kg': r.kg},
         ],
         'water': waterLogged,
+        'sips': [for (final s in sips) s.toJson()],
+        'archive': archive.toJson(),
+        'day': _currentDay,
         'steps': stepsToday,
         'activityKcal': activityCaloriesBurned,
         'workoutsToday': workoutsCompletedToday,
@@ -773,6 +866,8 @@ class PulseStore extends ChangeNotifier {
   Future<void> deleteAllLocalData() async {
     diary.clear();
     weights.clear();
+    archive.clear();
+    sips.clear();
     waterLogged = 0;
     stepsToday = 0;
     activityCaloriesBurned = 0;

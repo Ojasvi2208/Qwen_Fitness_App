@@ -26,33 +26,12 @@ class TrainScreen extends StatelessWidget {
         ]),
         const SizedBox(height: PulseSpacing.l),
         // Today's workout hero — Card/WorkoutHero
-        PulseCard(
-          padding: const EdgeInsets.all(PulseSpacing.l),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('TODAY\'S WORKOUT', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
-            const SizedBox(height: 4),
-            Text('Upper Body Strength', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: PulseSpacing.xs),
-            const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
-              ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
-              ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
-              ]),
-            ]),
-            const SizedBox(height: PulseSpacing.m),
-            PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
-              context.pulse.startWorkout('Upper Body Strength');
-              Navigator.of(context).pushNamed('/active-workout', arguments: 'Upper Body Strength');
-            }),
-            const SizedBox(height: PulseSpacing.s),
-            Center(child: Text('Planned for 6:30 PM · you can start any time', style: Theme.of(context).textTheme.labelSmall)),
-          ]),
-        ),
+        // C1: the duration, level and exercise count were typed into the card
+        // ('45 min', 'Intermediate', '8 exercises') beside a hard-coded name,
+        // so they would keep claiming those figures after the template changed.
+        // All four now read the template, and the card is labelled a
+        // suggestion: nothing schedules a workout, so '6:30 PM' was invented.
+        _todayWorkoutCard(context, WorkoutTemplates.library.first),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Recommended for You', actionLabel: 'See all', onAction: () => Navigator.of(context).pushNamed('/workout-library')),
         SizedBox(
@@ -80,6 +59,32 @@ class TrainScreen extends StatelessWidget {
       ]),
     );
   }
+
+  /// Reads every figure from [t] so the hero cannot drift from the template.
+  Widget _todayWorkoutCard(BuildContext context, WorkoutTemplate t) => PulseCard(
+        padding: const EdgeInsets.all(PulseSpacing.l),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('SUGGESTED WORKOUT', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
+          const SizedBox(height: 4),
+          Text(t.name, style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: PulseSpacing.xs),
+          // O7+O8 §2.1: the Wrap wraps, but each inner Row had an unbounded
+          // Text and mainAxisSize.min, so a single item could still exceed
+          // the line at a large text scale. pulseMetaChip bounds the label.
+          Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
+            pulseMetaChip(Icons.schedule_rounded, '${t.minutes} min'),
+            pulseMetaChip(Icons.leaderboard_rounded, t.level.label),
+            pulseMetaChip(Icons.bolt_rounded, '${t.plan.length} exercises'),
+          ]),
+          const SizedBox(height: PulseSpacing.m),
+          PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
+            context.pulse.startWorkout(t.name);
+            Navigator.of(context).pushNamed('/active-workout', arguments: t.name);
+          }),
+          const SizedBox(height: PulseSpacing.s),
+          Center(child: Text('Start it whenever you like', style: Theme.of(context).textTheme.labelSmall)),
+        ]),
+      );
 
   Widget _recCard(BuildContext c, ({String name, int minutes, String level, String category, int exercises, int kcal, List<String> equipment}) w) => SizedBox(
         width: 190,
@@ -714,62 +719,79 @@ class _WorkoutCompleteScreenState extends State<WorkoutCompleteScreen> {
 // ── §38 Cardio Activity detail + Log Exercise ──────────────────────
 class ActivityDetailScreen extends StatelessWidget {
   const ActivityDetailScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    // §3: this screen showed "5.26 km", "146 bpm" and a painted GPS
+    // route. The app records no distance, no heart rate and no location
+    // — there is no sensor or permission behind any of it — so those
+    // figures are gone rather than replaced with a different invention.
+    // What is real is the completed-session history, and today's steps.
+    final history = store.sessions.history
+        .where((s) => s.status == SessionStatus.finished)
+        .toList(growable: false);
+    final latest = history.isEmpty ? null : history.first;
+
     return PulseScaffold(
       title: 'Activity',
-      subtitle: 'Recent cardio & steps',
-      body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        // Morning run summary card
-        PulseCard(
-          padding: const EdgeInsets.all(PulseSpacing.l),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              const Icon(Icons.directions_run_rounded, color: PulseColors.caloriesBurned),
-              const SizedBox(width: PulseSpacing.s),
-              Expanded(child: Text('Morning Run', style: Theme.of(context).textTheme.titleLarge)),
-              Text('Today · 6:40 AM', style: Theme.of(context).textTheme.labelMedium),
+      subtitle: 'Your completed workouts',
+      body: latest == null
+          ? EmptyState(
+              icon: Icons.directions_run_rounded,
+              title: 'No activity recorded yet',
+              body: 'Finish a workout or log a cardio session and it will be '
+                  'summarised here with its real duration and sets.',
+              actionLabel: 'Add Manual Cardio Activity',
+              onAction: () => Navigator.of(context).pushNamed('/log-exercise'),
+            )
+          : ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
+              PulseCard(
+                padding: const EdgeInsets.all(PulseSpacing.l),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.fitness_center_rounded, color: PulseColors.caloriesBurned),
+                    const SizedBox(width: PulseSpacing.s),
+                    Expanded(child: Text(latest.templateName, style: Theme.of(context).textTheme.titleLarge)),
+                    Flexible(child: Text(fmtMediumDate(latest.startedAt),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium)),
+                  ]),
+                  const SizedBox(height: PulseSpacing.m),
+                  Row(children: [
+                    _stat(context, 'Duration', '${latest.durationMinutes} min'),
+                    _stat(context, 'Sets', '${latest.totalSets}'),
+                    _stat(context, 'Exercises', '${latest.exercisesCompleted}'),
+                  ]),
+                  const SizedBox(height: PulseSpacing.m),
+                  Row(children: [
+                    // Labelled estimated because it is a MET-style
+                    // estimate, not a measurement (§37).
+                    _stat(context, 'Calories (est.)', '${latest.estimatedKcal}'),
+                    _stat(context, 'Volume', '${latest.volumeKg.round()} kg'),
+                    _stat(context, 'Steps today', '${store.stepsToday.round()}'),
+                  ]),
+                ]),
+              ),
+              const SizedBox(height: PulseSpacing.l),
+              if (history.length > 1) ...[
+                SectionHeader(title: 'History'),
+                for (final a in history.skip(1))
+                  Card(
+                    child: ListTile(
+                      leading: CircleAvatar(backgroundColor: PulseColors.caloriesBurned.withOpacity(0.12),
+                          child: const Icon(Icons.fitness_center_rounded, size: 20, color: PulseColors.caloriesBurned)),
+                      title: Text(a.templateName, style: Theme.of(context).textTheme.titleMedium),
+                      subtitle: Text('${fmtShortDate(a.startedAt)} · ${a.durationMinutes} min · ${a.totalSets} sets'),
+                      trailing: Icon(Icons.chevron_right_rounded, color: scheme.onSurface.withOpacity(0.35)),
+                      onTap: () => pulseSnack(context, 'Opened ${a.templateName}.', icon: Icons.timeline_rounded),
+                    ),
+                  ),
+              ],
+              SecondaryButton(label: 'Add Manual Cardio Activity', icon: Icons.add_rounded,
+                  onTap: () => Navigator.of(context).pushNamed('/log-exercise')),
             ]),
-            const SizedBox(height: PulseSpacing.m),
-            // Route map placeholder (shown only because GPS was enabled)
-            Container(height: 130, width: double.infinity,
-                decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(PulseRadius.m)),
-                child: Stack(children: [
-                  CustomPaint(size: Size.infinite, painter: _RoutePainter(scheme.primary)),
-                  Positioned(left: 10, bottom: 8, child: Text('Route shown because Location was allowed for tracking', style: Theme.of(context).textTheme.labelSmall)),
-                ])),
-            const SizedBox(height: PulseSpacing.m),
-            Row(children: [
-              _stat(context, 'Distance', '5.26 km'),
-              _stat(context, 'Duration', '31:42'),
-              _stat(context, 'Avg Pace', '6:01 / km'),
-            ]),
-            const SizedBox(height: PulseSpacing.m),
-            Row(children: [
-              _stat(context, 'Calories', '428'),
-              _stat(context, 'Heart Rate', '146 bpm'),
-              _stat(context, 'Elevations', '+38 m'),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: PulseSpacing.l),
-        SectionHeader(title: 'History'),
-        for (final a in const [('Running', 'Mon · 6.1 km · 38:04'), ('Cycling', 'Sat · 21.4 km · 58:12'), ('Walking', 'Fri · 4.2 km · 42:30'), ('Strength', 'Wed · Upper Body · 41 min')])
-          Card(
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: PulseColors.caloriesBurned.withOpacity(0.12),
-                  child: Icon(a.$1 == 'Strength' ? Icons.fitness_center_rounded : a.$1 == 'Cycling' ? Icons.two_wheeler_rounded : a.$1 == 'Running' ? Icons.directions_run_rounded : Icons.directions_walk_rounded,
-                      size: 20, color: PulseColors.caloriesBurned)),
-              title: Text(a.$1, style: Theme.of(context).textTheme.titleMedium),
-              subtitle: Text(a.$2),
-              trailing: Icon(Icons.chevron_right_rounded, color: scheme.onSurface.withOpacity(0.35)),
-              onTap: () => pulseSnack(context, 'Open activity summary for ${a.$2.split(' · ').first}.', icon: Icons.timeline_rounded),
-            ),
-          ),
-        SecondaryButton(label: 'Add Manual Cardio Activity', icon: Icons.add_rounded,
-            onTap: () => Navigator.of(context).pushNamed('/log-exercise')),
-      ]),
     );
   }
 
@@ -778,29 +800,6 @@ class ActivityDetailScreen extends StatelessWidget {
         Text(v, style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
         Text(l, style: Theme.of(c).textTheme.labelSmall),
       ]));
-}
-
-class _RoutePainter extends CustomPainter {
-  _RoutePainter(this.color);
-  final Color color;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(size.width * 0.12, size.height * 0.8)
-      ..quadraticBezierTo(size.width * 0.2, size.height * 0.2, size.width * 0.45, size.height * 0.4)
-      ..quadraticBezierTo(size.width * 0.7, size.height * 0.6, size.width * 0.72, size.height * 0.22)
-      ..quadraticBezierTo(size.width * 0.74, size.height * 0.05, size.width * 0.88, size.height * 0.3);
-    canvas.drawPath(path, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round
-      ..color = color);
-    canvas.drawCircle(Offset(size.width * 0.12, size.height * 0.8), 6, Paint()..color = PulseColors.success);
-    canvas.drawCircle(Offset(size.width * 0.88, size.height * 0.3), 6, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ── Log Exercise quick screen ──────────────────────────────────────

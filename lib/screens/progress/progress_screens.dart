@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/day_archive.dart';
 import '../../data/measurements.dart';
 import '../../data/progress_photos.dart';
 import '../../data/pulse_store.dart';
@@ -167,14 +168,42 @@ class WeightProgressScreen extends StatelessWidget {
               child: PulseLineChart(points: store.weightSeries, height: 190, color: scheme.primary, goalY: store.goals.targetWeightKg),
             ),
             const SizedBox(height: PulseSpacing.s),
-            Row(children: [
-              Container(width: 14, height: 3, color: scheme.primary),
-              const SizedBox(width: 6),
-              Text('Your weight trend', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(width: PulseSpacing.l),
-              Container(width: 14, height: 0, decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.primary.withOpacity(0.4), width: 1.4)))),
-              const SizedBox(width: 6),
-              Text('Goal 75 kg', style: Theme.of(context).textTheme.labelMedium),
+            // O5 §2.1: two swatch+label pairs with a fixed gap came to 406 px
+            // in a 255 px card and failed on the tablet too, so this is not a
+            // narrow-screen problem — the pairs wrap instead of shrinking.
+            // The goal also read a hard-coded "75 kg" for every user; it is
+            // the user's own target, and absent until they set one.
+            Wrap(spacing: PulseSpacing.l, runSpacing: PulseSpacing.xs, children: [
+              // Bounded like pulseMetaChip: the swatch keeps its width and
+              // the label ellipsises, so a large text scale cannot push the
+              // pair past the Wrap's line.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 220),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 14, height: 3, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text('Your weight trend',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium),
+                  ),
+                ]),
+              ),
+              if (store.goals.targetWeightKg > 0)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 14, height: 0, decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.primary.withOpacity(0.4), width: 1.4)))),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text('Goal ${fmtKg(store.goals.targetWeightKg, store.unitsWeight)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium),
+                    ),
+                  ]),
+                ),
             ]),
           ]),
         ),
@@ -303,14 +332,18 @@ class NutritionProgressScreen extends StatelessWidget {
         SectionHeader(title: 'Calories'),
         PulseCard(
           child: Column(children: [
-            PulseBarChart(values: const [1980, 2210, 2050, 2340, 1890, 2100, 2080], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 2050, highlightIndex: 6),
+            // C1: seven const bars presented as the user's week, with a
+            // '7-day average' computed from them. No daily calorie history is
+            // kept, so only the goal below is a real number.
+            const EmptyState(
+                icon: Icons.bar_chart_rounded,
+                title: 'Your calorie week is building',
+                body: 'Each logged day adds a bar here, measured against your goal.'),
             const SizedBox(height: PulseSpacing.s),
             Row(children: [
-              Expanded(child: _avg(context, 'Goal average', '2,050 kcal')),
-              Expanded(child: _avg(context, '7-day average', '2,084 kcal')),
+              Expanded(child: _avg(context, 'Goal', '${store.goals.calorieGoal.toStringAsFixed(0)} kcal')),
+              Expanded(child: _avg(context, 'Logged today', '${store.foodKcal.toStringAsFixed(0)} kcal')),
             ]),
-            Text('Bars above the dashed goal line mean surplus days — three of seven were within ±5% of target.',
-                style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
         const SizedBox(height: PulseSpacing.l),
@@ -393,21 +426,26 @@ class ActivityProgressScreen extends StatelessWidget {
       title: 'Activity Progress',
       subtitle: 'Steps · burn · workouts — last 7 days',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        PulseCard(
-          child: Column(children: [
-            PulseBarChart(values: const [5760, 7600, 4880, 8000, 7040, 3600, 6842], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 8000),
-            const SizedBox(height: PulseSpacing.s),
-            Text('You hit your step goal on 2 of 7 days. Weekends dip most — a Sunday walk habit could fix that.',
-                style: TextStyle(fontSize: 14.5, height: 1.4, color: scheme.onSurface)),
-          ]),
+        // C1: this chart's seven bars and the prose beneath them were a const
+        // list — a week the user never walked. Nothing records step history
+        // (the store holds only stepsToday), so there is no honest series to
+        // draw; StepsScreen's empty state is the pattern this follows.
+        const PulseCard(
+          child: EmptyState(
+              icon: Icons.bar_chart_rounded,
+              title: 'Your weekly pattern is building',
+              body: 'Each day of recorded steps adds a bar here, measured against your daily goal.'),
         ),
         const SizedBox(height: PulseSpacing.m),
+        // C1: 'Daily average 6,932' and 'Active calories 2,140' were literals.
+        // Workouts is a real counter, so it stays; the other two derive from
+        // today's steps and are named as today, not as a weekly average.
         Row(children: [
-          Expanded(child: _mini(context, 'Daily average', '6,932', 'steps')),
+          Expanded(child: _mini(context, 'Steps today', store.stepsToday.toStringAsFixed(0), 'steps')),
           const SizedBox(width: PulseSpacing.s),
-          Expanded(child: _mini(context, 'Active calories', '2,140', 'kcal burned')),
+          Expanded(child: _mini(context, 'Active calories', '${(store.stepsToday * 0.04).round()}', 'kcal burned')),
           const SizedBox(width: PulseSpacing.s),
-          Expanded(child: _mini(context, 'Workouts', '4', 'completed')),
+          Expanded(child: _mini(context, 'Workouts', '${store.workoutsCompletedToday}', 'completed today')),
         ]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'This month vs last'),
@@ -701,12 +739,41 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
 // ── §48 Weekly Report ──────────────────────────────────────────────
 class WeeklyReportScreen extends StatelessWidget {
   const WeeklyReportScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    final week = store.archive.lastDays(7);
+    final logged = week.where((d) => d.logged).toList(growable: false);
+
+    // §3: every row below was a literal — "58,420 steps", "5 / 7". The
+    // report now reads the archive, so a week with nothing in it says so
+    // rather than describing someone else's.
+    if (logged.isEmpty) {
+      return PulseScaffold(
+        title: 'Your Week',
+        subtitle: 'Arrives once you have logged a few days',
+        body: const EmptyState(
+          icon: Icons.summarize_rounded,
+          title: 'No week to report yet',
+          body: 'Log a day or two and your week will be summarised here — '
+              'steps, protein, workouts and weight, all from what you record.',
+        ),
+      );
+    }
+
+    final span = _spanLabel(week);
+    final avgKcal = logged.fold(0.0, (sum, d) => sum + d.kcal) / logged.length;
+    final proteinDays = store.archive.proteinDaysMeeting(store.goals.proteinGoal, 7);
+    final steps = store.archive.totalSteps(7);
+    final workouts = store.archive.totalWorkouts(7);
+    final waterDays = logged.where((d) => d.waterLiters >= store.goals.waterGoalLiters).length;
+    final weightDelta = _weightDelta(store);
+
     return PulseScaffold(
       title: 'Your Week',
-      subtitle: 'Sep 21–27 · delivered every Monday morning',
+      subtitle: span,
       actions: [IconButton3(icon: Icons.share_rounded, tooltip: 'Share report',
           onTap: () => pulseSnack(context, 'Shared as an image — only the metrics you ticked.', icon: Icons.image_rounded))],
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
@@ -720,7 +787,7 @@ class WeeklyReportScreen extends StatelessWidget {
             const SizedBox(width: PulseSpacing.sm),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Biggest win', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
-              Text('You completed four workouts this week.',
+              Text(_biggestWin(logged.length, workouts, steps),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             ])),
           ]),
@@ -728,21 +795,28 @@ class WeeklyReportScreen extends StatelessWidget {
         const SizedBox(height: PulseSpacing.l),
         for (final sec in <({String title, IconData icon, List<({String l, String v, String sub})> rows})>[
           (title: 'Nutrition', icon: Icons.restaurant_rounded, rows: [
-            (l: 'Average calories', v: '2,075', sub: 'goal 2,050 · +1%'),
-            (l: 'Protein goal reached', v: '5 / 7', sub: 'days at ≥ 90% target'),
+            (l: 'Average calories', v: avgKcal.round().toString(),
+             sub: 'goal ${store.goals.calorieGoal.round()} · across ${logged.length} logged ${logged.length == 1 ? 'day' : 'days'}'),
+            (l: 'Protein goal reached', v: '$proteinDays / ${logged.length}',
+             sub: 'days at or above ${store.goals.proteinGoal.round()} g'),
           ]),
           (title: 'Activity', icon: Icons.directions_walk_rounded, rows: [
-            (l: 'Steps', v: '58,420', sub: 'daily avg 8,345'),
-            (l: 'Active calories', v: '2,140', sub: '+12% vs last month'),
+            (l: 'Steps', v: _thousands(steps),
+             sub: 'daily avg ${_thousands(steps / logged.length)}'),
           ]),
-          (title: 'Weight', icon: Icons.monitor_weight_rounded, rows: [
-            (l: 'Trend change', v: '−0.8 kg', sub: 'moving toward 75 kg goal'),
-          ]),
+          if (weightDelta != null)
+            (title: 'Weight', icon: Icons.monitor_weight_rounded, rows: [
+              (l: 'Trend change', v: weightDelta,
+               sub: store.goals.targetWeightKg > 0
+                   ? 'goal ${fmtKg(store.goals.targetWeightKg, store.unitsWeight)}'
+                   : 'no target weight set'),
+            ]),
           (title: 'Workouts', icon: Icons.fitness_center_rounded, rows: [
-            (l: 'Completed', v: '4', sub: 'strength 2 · cardio 1 · yoga 1'),
+            (l: 'Completed', v: '$workouts', sub: workouts == 0 ? 'none logged this week' : 'across the week'),
           ]),
           (title: 'Hydration', icon: Icons.water_drop_rounded, rows: [
-            (l: 'Water goal reached', v: '6 / 7', sub: 'Thursday was the miss'),
+            (l: 'Water goal reached', v: '$waterDays / ${logged.length}',
+             sub: 'days at or above ${store.goals.waterGoalLiters.toStringAsFixed(1)} L'),
           ]),
         ]) ...[
           SectionHeader(title: sec.title),
@@ -763,18 +837,61 @@ class WeeklyReportScreen extends StatelessWidget {
           ),
         ],
         const SizedBox(height: PulseSpacing.m),
-        Container(
-          padding: const EdgeInsets.all(PulseSpacing.m),
-          decoration: BoxDecoration(color: PulseColors.info.withOpacity(0.1), borderRadius: BorderRadius.circular(PulseRadius.m)),
-          child: Row(children: [
-            const Icon(Icons.flag_rounded, color: PulseColors.info, size: 20),
-            const SizedBox(width: PulseSpacing.sm),
-            Expanded(child: Text('Next week focus: keep protein above 130 g on weekend days — that\'s where the misses cluster.',
-                style: TextStyle(fontSize: 14.5, height: 1.4, color: scheme.onSurface))),
-          ]),
-        ),
+        if (logged.length < 7)
+          Container(
+            padding: const EdgeInsets.all(PulseSpacing.m),
+            decoration: BoxDecoration(color: PulseColors.info.withOpacity(0.1), borderRadius: BorderRadius.circular(PulseRadius.m)),
+            child: Row(children: [
+              const Icon(Icons.flag_rounded, color: PulseColors.info, size: 20),
+              const SizedBox(width: PulseSpacing.sm),
+              // §3 honest framing: say what the figures rest on rather
+              // than inventing a trend from a partial week.
+              Expanded(child: Text(
+                  'Based on ${logged.length} logged ${logged.length == 1 ? 'day' : 'days'}. '
+                  'The more days you log, the more this report can tell you.',
+                  style: TextStyle(fontSize: 14.5, height: 1.4, color: scheme.onSurface))),
+            ]),
+          ),
       ]),
     );
+  }
+
+  /// The span the report actually covers, read off the records rather
+  /// than a hard-coded "Sep 21–27".
+  static String _spanLabel(List<DayRecord> week) {
+    if (week.isEmpty) return 'No days recorded yet';
+    final first = DateTime.tryParse(week.first.date);
+    final last = DateTime.tryParse(week.last.date);
+    if (first == null || last == null) return 'Your recent days';
+    return '${fmtShortDate(first)}–${fmtShortDate(last)}';
+  }
+
+  /// §49 non-punitive framing: name something the user actually did.
+  static String _biggestWin(int loggedDays, int workouts, double steps) {
+    if (workouts > 0) {
+      return 'You completed $workouts ${workouts == 1 ? 'workout' : 'workouts'} this week.';
+    }
+    if (steps > 0) return 'You walked ${_thousands(steps)} steps this week.';
+    return 'You logged $loggedDays ${loggedDays == 1 ? 'day' : 'days'} this week.';
+  }
+
+  /// Weight movement across the recorded span — null when there is not
+  /// enough history to claim a direction.
+  static String? _weightDelta(PulseStore store) {
+    if (store.weights.length < 2) return null;
+    final delta = store.weights.last.kg - store.weights.first.kg;
+    final sign = delta > 0 ? '+' : '−';
+    return '$sign${delta.abs().toStringAsFixed(1)} kg';
+  }
+
+  static String _thousands(double v) {
+    final n = v.round().toString();
+    final out = StringBuffer();
+    for (var i = 0; i < n.length; i++) {
+      if (i > 0 && (n.length - i) % 3 == 0) out.write(',');
+      out.write(n[i]);
+    }
+    return out.toString();
   }
 }
 
@@ -814,30 +931,59 @@ class InsightsScreen extends StatelessWidget {
 // ── §49 Streaks (non-punitive framing) ─────────────────────────────
 class StreaksScreen extends StatelessWidget {
   const StreaksScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    final archive = store.archive;
+    final now = DateTime.now();
+
+    // §3: "7-day streak" and "18 of the last 21 days" were constants.
+    // Both now count real records, so a user who has logged nothing is
+    // told that plainly instead of being congratulated for it.
+    final logStreak = archive.streakAsOf(now);
+    final waterStreak = archive.streakWhere((d) => d.waterLiters >= store.goals.waterGoalLiters, now);
+    final workoutStreak = archive.streakWhere((d) => d.workouts > 0, now);
+    final loggedIn21 = archive.loggedInLast(21);
+    final windowDays = archive.days.length < 21 ? archive.days.length : 21;
+
+    if (archive.days.isEmpty) {
+      return PulseScaffold(
+        title: 'Consistency',
+        subtitle: 'Streaks celebrate rhythm — they never punish a miss',
+        body: const EmptyState(
+          icon: Icons.local_fire_department_rounded,
+          title: 'Your first day starts the streak',
+          body: 'Log a meal, a glass of water or a workout and your consistency '
+              'will build here. Nothing is counted until you record it.',
+        ),
+      );
+    }
+
     return PulseScaffold(
       title: 'Consistency',
       subtitle: 'Streaks celebrate rhythm — they never punish a miss',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        for (final s in const [
-          ('Food logging', '7-day streak', Icons.restaurant_rounded, PulseColors.accent, 7, 10),
-          ('Hydration', '5-day streak', Icons.water_drop_rounded, PulseColors.water, 5, 10),
-          ('Workout consistency', '3-week streak', Icons.fitness_center_rounded, PulseColors.exercise, 3, 8),
+        for (final s in <({String label, int days, IconData icon, Color color})>[
+          (label: 'Food logging', days: logStreak, icon: Icons.restaurant_rounded, color: PulseColors.accent),
+          (label: 'Hydration', days: waterStreak, icon: Icons.water_drop_rounded, color: PulseColors.water),
+          (label: 'Workout consistency', days: workoutStreak, icon: Icons.fitness_center_rounded, color: PulseColors.exercise),
         ])
           Card(
             child: Padding(
               padding: const EdgeInsets.all(PulseSpacing.m),
               child: Row(children: [
-                Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: s.$4.withOpacity(0.12), borderRadius: BorderRadius.circular(PulseRadius.s)),
-                    child: Icon(s.$3, color: s.$4, size: 20)),
+                Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: s.color.withOpacity(0.12), borderRadius: BorderRadius.circular(PulseRadius.s)),
+                    child: Icon(s.icon, color: s.color, size: 20)),
                 const SizedBox(width: PulseSpacing.sm),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.$1, style: Theme.of(context).textTheme.titleMedium),
-                  Text(s.$2, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: s.$4)),
+                  Text(s.label, style: Theme.of(context).textTheme.titleMedium),
+                  Text(s.days == 0 ? 'No streak yet' : '${s.days}-day streak',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: s.color)),
                   const SizedBox(height: PulseSpacing.xs),
-                  PulseBar(value: s.$5 / s.$6, color: s.$4, height: 6),
+                  // Against a week, which is the rhythm the app asks for.
+                  PulseBar(value: (s.days / 7).clamp(0.0, 1.0), color: s.color, height: 6),
                 ])),
               ]),
             ),
@@ -847,7 +993,8 @@ class StreaksScreen extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('If a streak breaks', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: PulseSpacing.xs),
-            Text('You logged 18 of the last 21 days. That\'s still meaningful consistency.',
+            Text('You logged $loggedIn21 of the last $windowDays ${windowDays == 1 ? 'day' : 'days'}. '
+                "That's still meaningful consistency.",
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.45)),
             const SizedBox(height: PulseSpacing.s),
             Text('PULSE keeps long-window stats like this alongside streaks so one quiet day never erases your record.',
@@ -857,17 +1004,25 @@ class StreaksScreen extends StatelessWidget {
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Achievements (§66)'),
         Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.s, children: [
-          for (final a in const [('First Workout', Icons.emoji_events_rounded, true), ('10 Workouts', Icons.workspace_premium_rounded, true), ('50 km Walked', Icons.hiking_rounded, true), ('7-Day Logging', Icons.event_available_rounded, true), ('100,000 Steps', Icons.terrain_rounded, false), ('First Recipe', Icons.menu_book_rounded, false)])
+          // §66: each badge is earned against a figure the archive holds,
+          // so none of them can read as earned before the user earns it.
+          for (final a in <({String label, IconData icon, bool earned})>[
+            (label: 'First Workout', icon: Icons.emoji_events_rounded, earned: archive.totalWorkouts(kDayArchiveMaxDays) >= 1),
+            (label: '10 Workouts', icon: Icons.workspace_premium_rounded, earned: archive.totalWorkouts(kDayArchiveMaxDays) >= 10),
+            (label: '7-Day Logging', icon: Icons.event_available_rounded, earned: logStreak >= 7),
+            (label: '100,000 Steps', icon: Icons.terrain_rounded, earned: archive.totalSteps(kDayArchiveMaxDays) >= 100000),
+          ])
             Container(
               padding: const EdgeInsets.symmetric(horizontal: PulseSpacing.m, vertical: PulseSpacing.sm),
               decoration: BoxDecoration(
-                  color: a.$3 ? PulseColors.secondary.withOpacity(0.12) : scheme.surfaceContainerHighest,
+                  color: a.earned ? PulseColors.secondary.withOpacity(0.12) : scheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(PulseRadius.full),
-                  border: Border.all(color: a.$3 ? PulseColors.secondary.withOpacity(0.5) : scheme.onSurface.withOpacity(0.12))),
+                  border: Border.all(color: a.earned ? PulseColors.secondary.withOpacity(0.5) : scheme.onSurface.withOpacity(0.12))),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(a.$2, size: 17, color: a.$3 ? PulseColors.secondary : scheme.onSurface.withOpacity(0.4)),
+                Icon(a.icon, size: 17, color: a.earned ? PulseColors.secondary : scheme.onSurface.withOpacity(0.4)),
                 const SizedBox(width: 6),
-                Text(a.$1, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: a.$3 ? scheme.onSurface : scheme.onSurface.withOpacity(0.5))),
+                Flexible(child: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: a.earned ? scheme.onSurface : scheme.onSurface.withOpacity(0.5)))),
               ]),
             ),
         ]),
@@ -920,29 +1075,57 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 Text('Your weight and activity have changed since your plan was created. We suggest reviewing — your current targets stay exactly as they are until you confirm.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14.5, height: 1.45)),
                 const SizedBox(height: PulseSpacing.sm),
-                Row(children: [
+                // O3 §2.1: "Review Plan" and "Keep Current Plan" are 510 px of
+                // button in a 256 px card on a small screen, and neither label
+                // can shrink without becoming a different instruction. They
+                // wrap onto a second line instead.
+                Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.xs, children: [
                   FilledButton(onPressed: () => Navigator.of(context).pushNamed('/goal-editor'), child: const Text('Review Plan')),
-                  const SizedBox(width: PulseSpacing.s),
                   TextButton(onPressed: () => setState(() => _showAdjust = false), child: const Text('Keep Current Plan')),
                 ]),
               ]),
             ),
           ),
         const SizedBox(height: PulseSpacing.s),
+        // O1+O2 §2.1: this was a ListTile whose `title` and `trailing` were
+        // laid out against no shared width budget, so at a large text scale
+        // the label and the value each claimed the full row and the pair
+        // overflowed. One fix, not two: the label and the value are now
+        // siblings in a single Row that divides the space between them —
+        // the label yields first, the value keeps what it needs.
         for (final g in goals)
           Card(
-            child: ListTile(
-              leading: Icon(g.icon, color: scheme.onSurface.withOpacity(0.6)),
-              title: Text(g.label, style: Theme.of(context).textTheme.titleMedium),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(g.value, style: PulseTypography.metricSmall.copyWith(color: scheme.primary, fontSize: 17)),
-                const SizedBox(width: PulseSpacing.s),
-                Icon(Icons.edit_outlined, size: 18, color: scheme.onSurface.withOpacity(0.4)),
-              ]),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(PulseRadius.m),
               onTap: () {
                 store.track('goal_updated_opened');
                 Navigator.of(context).pushNamed(g.route, arguments: g.label);
               },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: PulseSpacing.m, vertical: PulseSpacing.m),
+                child: Row(children: [
+                  Icon(g.icon, color: scheme.onSurface.withOpacity(0.6)),
+                  const SizedBox(width: PulseSpacing.m),
+                  Expanded(
+                    child: Text(g.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  const SizedBox(width: PulseSpacing.s),
+                  Flexible(
+                    child: Text(g.value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: PulseTypography.metricSmall
+                            .copyWith(color: scheme.primary, fontSize: 17)),
+                  ),
+                  const SizedBox(width: PulseSpacing.s),
+                  Icon(Icons.edit_outlined, size: 18, color: scheme.onSurface.withOpacity(0.4)),
+                ]),
+              ),
             ),
           ),
         const SizedBox(height: PulseSpacing.m),
@@ -1049,28 +1232,53 @@ class _GoalEditorScreenState extends State<GoalEditorScreen> {
 // ── §79 mini calendar for progress history ─────────────────────────
 class _ProgressCalendar extends StatelessWidget {
   const _ProgressCalendar();
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    final now = DateTime.now();
+    // §3: the month, its length and every dot were hard-coded — the
+    // grid showed "September 2026" with dots from `d % 3 == 0`. All
+    // three now come from the calendar and the archive.
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(PulseSpacing.l),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SheetHeader(title: 'September 2026', subtitle: 'Dots: • food logged ◦ workouts ✓ goal days'),
+          SheetHeader(
+              title: '${kMonthNames[now.month - 1]} ${now.year}',
+              subtitle: 'Dots: • food logged ◦ activity'),
           GridView.count(
             crossAxisCount: 7, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
             children: [
-              for (var d = 1; d <= 30; d++)
-                Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 34, height: 34,
-                        decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: d == 29 ? scheme.primary : d % 7 == 0 ? scheme.primary.withOpacity(0.15) : Colors.transparent),
-                        child: Center(child: Text('$d', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: d == 29 ? Colors.white : null)))),
-                    Text(d % 3 == 0 ? '◦' : d % 4 == 0 ? '✓' : '', style: TextStyle(fontSize: 9, color: scheme.primary)),
-                  ]),
-                ),
+              for (var d = 1; d <= daysInMonth; d++)
+                Builder(builder: (_) {
+                  final day = DateTime(now.year, now.month, d);
+                  final record = store.archive.forDay(day);
+                  final isToday = d == now.day;
+                  return Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 34, height: 34,
+                          decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isToday
+                                  ? scheme.primary
+                                  : (record?.logged ?? false)
+                                      ? scheme.primary.withOpacity(0.15)
+                                      : Colors.transparent),
+                          child: Center(child: Text('$d', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isToday ? Colors.white : null)))),
+                      Text(
+                          (record?.wasActive ?? false)
+                              ? '◦'
+                              : (record?.logged ?? false)
+                                  ? '•'
+                                  : '',
+                          style: TextStyle(fontSize: 9, color: scheme.primary)),
+                    ]),
+                  );
+                }),
             ],
           ),
         ]),

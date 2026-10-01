@@ -29,6 +29,40 @@ String fmtMl(double ml, String unit) => unit == 'oz'
     ? '${(ml / 29.5735).toStringAsFixed(0)} oz'
     : '${ml.toStringAsFixed(0)} ml';
 
+// ── Date formatting (C1) ───────────────────────────────────────────
+// Every screen that needed a date carried its own literal — the greeting
+// read 'Tuesday, September 29' forever and the diary's whole date axis was
+// three hard-coded strings. No intl dependency in this project, so the
+// names live here; `now` is injectable so a test can pin the day (§75).
+
+const kWeekdayNames = <String>['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const kMonthNames = <String>['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+const kMonthAbbrev = <String>['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// 'Tuesday, September 29' — the dashboard greeting line (§16).
+String fmtLongDate(DateTime d) => '${kWeekdayNames[d.weekday - 1]}, ${kMonthNames[d.month - 1]} ${d.day}';
+
+/// 'Tuesday, Sep 29' — the diary and detail headers, where space is tighter.
+String fmtMediumDate(DateTime d) => '${kWeekdayNames[d.weekday - 1]}, ${kMonthAbbrev[d.month - 1]} ${d.day}';
+
+/// 'Sep 29' — chips and ranges.
+String fmtShortDate(DateTime d) => '${kMonthAbbrev[d.month - 1]} ${d.day}';
+
+/// '8:10 AM' — timestamps on individual logged entries (§3), where the
+/// water screen previously printed invented times.
+String fmtClockTime(DateTime d) {
+  final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final minute = d.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${d.hour < 12 ? 'AM' : 'PM'}';
+}
+
+/// 'Good morning' / 'Good afternoon' / 'Good evening' (§16). The greeting said
+/// morning at every hour, which is a small falsehood of the same kind.
+String fmtGreeting(DateTime d) =>
+    d.hour < 12 ? 'Good morning' : d.hour < 17 ? 'Good afternoon' : 'Good evening';
+
 void pulseTapHaptic() => HapticFeedback.selectionClick();
 
 
@@ -36,6 +70,28 @@ void pulseSnack(BuildContext context, String message, {String? undoLabel, VoidCa
     PulseToast.show(context, message, undoLabel: undoLabel, onUndo: onUndo, icon: icon);
 
 /// Nav/Top — standard screen scaffold with back button & actions.
+/// §2.1 — an icon + label pair for a `Wrap` of metadata.
+///
+/// A bare `Row(mainAxisSize: min)` inside a `Wrap` still overflows when its
+/// own label is wider than the line, because `min` shrinks to the children
+/// rather than to the available width. [maxWidth] bounds it so the label
+/// ellipsises instead, and the icon always keeps its space.
+Widget pulseMetaChip(IconData icon, String label,
+        {double maxWidth = 220, double fontSize = 15}) =>
+    ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: fontSize)),
+        ),
+      ]),
+    );
+
 class PulseScaffold extends StatelessWidget {
   const PulseScaffold({super.key, required this.title, required this.body, this.actions, this.bottomBar,
       this.floatingAction, this.floatingActionButton, this.onBack, this.subtitle});
@@ -52,10 +108,18 @@ class PulseScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title),
+        // §2.1: the title block sat unbounded between the back button and
+        // the actions, so a long subtitle pushed the app bar 159 px past
+        // its box on a 320 px screen. Both lines ellipsise rather than
+        // overflow — this is the shared scaffold, so every screen with a
+        // subtitle was failing on it.
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
           if (subtitle != null)
-            Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
+            Text(subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
         ]),
         leading: onBack != null || Navigator.of(context).canPop()
             ? IconButton(
@@ -108,7 +172,9 @@ class SheetHeader extends StatelessWidget {
 /// Priority order per §89: Food → Water → Exercise → Weight.
 Future<void> openQuickLog(BuildContext context) async {
   context.pulse.track('quick_log_opened');
-  await pulseSheet<void>(context, builder: (ctx) => const _QuickLogSheet());
+  // D3: eight items could not fit the default 65% cap and overflowed by 176 px
+  // on a 360×800 screen. tall: true raises the cap; the body scrolls (below).
+  await pulseSheet<void>(context, builder: (ctx) => const _QuickLogSheet(), tall: true);
 }
 
 class _QuickLogSheet extends StatelessWidget {
@@ -136,9 +202,10 @@ class _QuickLogSheet extends StatelessWidget {
     return SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         const SheetHeader(title: 'What would you like to log?', subtitle: 'The fastest actions are always one tap away.'),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const ClampingScrollPhysics(),
+        // D3: shrinkWrap sized the list to its content, so the sheet overflowed
+        // once the items exceeded its cap — and at a large textScale it still
+        // would. Flexible plus a scrolling list keeps every item reachable.
+        Flexible(child: ListView.separated(
           padding: const EdgeInsets.fromLTRB(PulseSpacing.l, 0, PulseSpacing.l, PulseSpacing.l),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: PulseSpacing.s),
@@ -165,7 +232,7 @@ class _QuickLogSheet extends StatelessWidget {
               ),
             );
           },
-        ),
+        )),
       ]),
     );
   }
@@ -288,9 +355,22 @@ class TrialStatusBanner extends StatelessWidget {
   }
 }
 
+/// Up to two initials from a display name (§14). Returns '' when the name holds
+/// no letters, so the caller shows a neutral icon rather than inventing any.
+String pulseInitials(String name) {
+  final letters = name.trim().split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0])
+      .where((c) => RegExp(r'[A-Za-z]').hasMatch(c));
+  return letters.take(2).join().toUpperCase();
+}
+
 /// Compact avatar used in headers/profile.
+/// [initials] is required on purpose: the old default of 'AM' outlived the
+/// removed sample identity and read 'AM' beside every real name (D1/C4).
+/// Empty initials render a neutral person icon — never letters we invented.
 class PulseAvatar extends StatelessWidget {
-  const PulseAvatar({super.key, this.radius = 20, this.initials = 'AM', this.showPhoto = true});
+  const PulseAvatar({super.key, this.radius = 20, required this.initials, this.showPhoto = true});
   final double radius;
   final String initials;
   final bool showPhoto;
@@ -298,11 +378,13 @@ class PulseAvatar extends StatelessWidget {
   Widget build(BuildContext context) => CircleAvatar(
         radius: radius,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Text(initials,
-            style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: radius * 0.7,
-                color: Theme.of(context).colorScheme.primary)),
+        child: initials.isEmpty
+            ? Icon(Icons.person_rounded, size: radius, color: Theme.of(context).colorScheme.primary)
+            : Text(initials,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: radius * 0.7,
+                    color: Theme.of(context).colorScheme.primary)),
       );
 }
 
@@ -322,11 +404,18 @@ class TrendIndicator extends StatelessWidget {
     final color = good ? PulseColors.success : PulseColors.warning;
     return Semantics(
       label: '${positive ? 'Up' : 'Down'} ${v.abs().toStringAsFixed(1)}$unit $label',
+      // O4 §2.1: the label is caller-supplied ("+1.2 kg this month") and
+      // unbounded, so it ran 176 px past an 82 px box. The arrow keeps its
+      // space; the text yields. Semantics above still reads it in full.
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 14, color: color),
         const SizedBox(width: 2),
-        Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600).copyWith(color: color)),
+        Flexible(
+          child: Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600).copyWith(color: color)),
+        ),
       ]),
     );
   }

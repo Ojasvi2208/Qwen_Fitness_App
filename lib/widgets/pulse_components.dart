@@ -53,9 +53,12 @@ class PrimaryButton extends StatelessWidget {
           ? const SizedBox(
               width: 22, height: 22,
               child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+          // O6 §2.1: the label is caller-supplied and unbounded, so at a
+          // large text scale it pushed the row past the button. The icon
+          // keeps its space; the label yields, as D6 settled it.
           : Row(mainAxisSize: MainAxisSize.min, children: [
               if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: PulseSpacing.s)],
-              Text(label),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
             ]),
     );
   }
@@ -303,11 +306,14 @@ class MacroRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: PulseSpacing.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // D6: label + value were both unconstrained, so a 360 px screen
+        // overflowed this row by 62 px. The label yields first (it is the
+        // repeated word); the value keeps its space because it is the number.
         Row(children: [
           Icon(iconData, size: 16, color: color),
           const SizedBox(width: PulseSpacing.s),
-          Text(label, style: theme.textTheme.titleMedium),
-          const Spacer(),
+          Expanded(child: Text(label, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: PulseSpacing.s),
           Text('${current.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit',
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
         ]),
@@ -663,8 +669,11 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // §2.1: the column is taller than a short screen at a large text
+    // scale, so it scrolls rather than overflowing — an empty state that
+    // overflows is the one thing it must never do.
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(PulseSpacing.xxl),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(

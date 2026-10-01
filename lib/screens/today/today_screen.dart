@@ -40,8 +40,11 @@ class _TodayScreenState extends State<TodayScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future.delayed(const Duration(milliseconds: 800));
-          pulseSnack(context, 'Synced with Apple Health · steps and workouts up to date.');
+          // v1: there is no health integration, so a refresh re-reads what
+          // is already on this device. It must not claim a sync that no
+          // code performs (§3 honesty rule).
+          await Future.delayed(const Duration(milliseconds: 300));
+          store.rolloverIfNeeded();
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, 120),
@@ -58,15 +61,19 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
-  Widget _greeting(BuildContext context, PulseStore store) => Padding(
+  /// C1: the greeting read 'Good morning' and 'Tuesday, September 29' whatever
+  /// the actual day or hour was. Both now come from the clock.
+  Widget _greeting(BuildContext context, PulseStore store) {
+    final now = DateTime.now();
+    return Padding(
         padding: const EdgeInsets.fromLTRB(PulseSpacing.xs, PulseSpacing.s, 0, PulseSpacing.l),
         child: Row(children: [
-          const PulseAvatar(radius: 22),
+          PulseAvatar(radius: 22, initials: pulseInitials(store.userName)),
           const SizedBox(width: PulseSpacing.sm),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Good morning, ${store.userFirstName}', style: Theme.of(context).textTheme.headlineMedium),
-              const Text('Tuesday, September 29', style: TextStyle(fontSize: 14)),
+              Text('${fmtGreeting(now)}, ${store.userFirstName}', style: Theme.of(context).textTheme.headlineMedium),
+              Text(fmtLongDate(now), style: const TextStyle(fontSize: 14)),
             ]),
           ),
           IconButton3(icon: Icons.notifications_none_rounded, selected: false,
@@ -74,6 +81,7 @@ class _TodayScreenState extends State<TodayScreen> {
           IconButton3(icon: Icons.search_rounded, onTap: () => Navigator.of(context).pushNamed('/search')),
         ]),
       );
+  }
 
   List<Widget> _module(BuildContext context, PulseStore s, String id) => switch (id) {
         'score' => [_scoreCard(context, s)],
@@ -313,28 +321,17 @@ class _TodayScreenState extends State<TodayScreen> {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
             ]),
           ),
+          // C1: this was a seven-bar chart drawn from a const list, presented
+          // as the user's week. Nothing records step history — the store holds
+          // only stepsToday — so the week cannot be drawn honestly. Today's
+          // ring is real; the fabricated week is gone rather than invented.
           Expanded(
             flex: 2,
             child: Semantics(
-              label: 'Seven day step chart: ${PulseData.weeklyStepChart.map((e) => (e * 100).round()).join(', ')} percent of goal each day',
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  for (var i = 0; i < PulseData.weeklyStepChart.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 3),
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: PulseData.weeklyStepChart[i]),
-                        duration: PulseDuration.ringFill,
-                        builder: (_, v, __) => Container(
-                            width: 8, height: 44 * v,
-                            decoration: BoxDecoration(
-                                color: i == 6 ? PulseColors.steps : PulseColors.steps.withOpacity(0.35),
-                                borderRadius: BorderRadius.circular(3))),
-                      ),
-                    ),
-                ],
+              label: 'Steps today: ${(pct * 100).round()} percent of goal',
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: PulseRing(value: pct, size: 56, stroke: 6, color: PulseColors.steps),
               ),
             ),
           ),
@@ -357,6 +354,9 @@ class _TodayScreenState extends State<TodayScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
+                // C1: each habit's `progress` was a literal ('1.7 / 2.6 L',
+                // '6,842 / 8,000') that no store field feeds. The chip now
+                // names the habit it tracks and nothing more.
                 for (final h in PulseData.habits.where((h) => h.on))
                   Padding(
                     padding: const EdgeInsets.only(right: PulseSpacing.s),
@@ -368,7 +368,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Icon(h.icon, size: 16, color: h.color),
                         const SizedBox(width: 6),
-                        Text('${h.name} · ${h.progress}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
+                        Text(h.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
                       ]),
                     ),
                   ),
@@ -379,7 +379,11 @@ class _TodayScreenState extends State<TodayScreen> {
       );
 
   // ── Actionable insight teaser (§47)
+  /// C1: this read 'You reached at least 90% of your protein goal on 5 of the
+  /// last 7 days' on a fresh install, where nothing had been logged at all.
+  /// The strip now stays hidden until there is data to say something about.
   Widget _insightStrip(BuildContext context, PulseStore s) {
+    if (!s.hasAnyData) return const SizedBox.shrink();
     final ins = PulseData.insights[0];
     return Padding(
       padding: const EdgeInsets.only(bottom: PulseSpacing.m),
@@ -511,20 +515,32 @@ class WaterScreen extends StatelessWidget {
         ]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Today\'s sips'),
-        for (final t in const [('8:10 AM', 0.3), ('9:45 AM', 0.25), ('12:30 PM', 0.5), ('2:00 PM', 0.35), ('4:15 PM', 0.3)])
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
-            leading: const Icon(Icons.water_drop_rounded, color: PulseColors.water, size: 20),
-            title: Text('${(t.$2 * 1000).toStringAsFixed(0)} ml'),
-            subtitle: Text(t.$1),
-            trailing: IconButton(
-                tooltip: 'Remove this entry',
-                icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                onPressed: () {
-                  s.addWater(-t.$2);
-                  pulseSnack(context, 'Entry removed', undoLabel: 'Undo', onUndo: () => s.addWater(t.$2));
-                }),
-          ),
+        // §3: five invented rows sat here, each with a delete button that
+        // subtracted a volume belonging to no real entry. These are the
+        // drinks actually logged today, newest first.
+        if (s.sips.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: PulseSpacing.m),
+            child: Text('Nothing logged yet today.',
+                style: Theme.of(context).textTheme.bodyMedium),
+          )
+        else
+          for (final sip in s.sips.reversed.toList(growable: false))
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
+              leading: const Icon(Icons.water_drop_rounded, color: PulseColors.water, size: 20),
+              title: Text('${(sip.liters * 1000).toStringAsFixed(0)} ml'),
+              subtitle: Text(fmtClockTime(sip.at)),
+              trailing: IconButton(
+                  tooltip: 'Remove this entry',
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  onPressed: () {
+                    s.removeSip(sip);
+                    pulseSnack(context, 'Entry removed',
+                        undoLabel: 'Undo',
+                        onUndo: () => s.logSip(sip.liters, now: sip.at));
+                  }),
+            ),
       ]),
     );
   }

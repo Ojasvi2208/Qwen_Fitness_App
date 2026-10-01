@@ -36,7 +36,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     final targetMeal = widget.meal ?? MealType.lunch;
     return PulseScaffold(
       title: 'Add Food',
-      subtitle: 'Logging into ${targetMeal.label.toLowerCase()} · Tuesday, Sep 29',
+      subtitle: 'Logging into ${targetMeal.label.toLowerCase()} · ${fmtMediumDate(DateTime.now())}',
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, PulseSpacing.s),
@@ -307,207 +307,31 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 }
 
 // ── §23 Barcode Scanner (camera UI + found/not-found states) ───────
-class BarcodeScannerScreen extends StatefulWidget {
+/// §23 — Barcode scanning is not in v1.
+///
+/// This screen previously rendered a camera viewfinder, a "Reading
+/// barcode…" state and a found-product result, with no camera and no
+/// product database behind any of it: the scan always "succeeded"
+/// against a hard-coded item. A control that cannot do what it depicts
+/// is the same defect as a fabricated figure, so it states its position
+/// plainly and sends the user to the search that does work.
+class BarcodeScannerScreen extends StatelessWidget {
   const BarcodeScannerScreen({super.key});
-  @override
-  State<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
-}
-
-enum _ScanState { scanning, processing, found, notFound }
-
-class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
-  _ScanState _state = _ScanState.scanning;
-  bool _flash = false;
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? Colors.black : const Color(0xFF101A17),
-      body: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.all(PulseSpacing.m),
-            child: Row(children: [
-              IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white), tooltip: 'Close', onPressed: () => Navigator.pop(context)),
-              const Spacer(),
-              Text('Scan Barcode', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
-              const Spacer(),
-              IconButton(
-                  tooltip: _flash ? 'Turn flashlight off' : 'Turn flashlight on',
-                  icon: Icon(_flash ? Icons.flashlight_on_rounded : Icons.flashlight_off_rounded, color: _flash ? Colors.amber : Colors.white),
-                  onPressed: () => setState(() => _flash = !_flash)),
-            ]),
-          ),
-          Expanded(
-            child: () {
-              switch (_state) {
-                case _ScanState.scanning: return _viewfinder();
-                case _ScanState.processing: return const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      CircularProgressIndicator(color: Colors.white),
-                      SizedBox(height: 16),
-                      Text('Reading barcode…', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                    ]));
-                case _ScanState.found: return _found();
-                case _ScanState.notFound: return _notFound();
-              }
-            }(),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _viewfinder() => Column(children: [
-        Expanded(
-          child: Stack(alignment: Alignment.center, children: [
-            // simulated camera feed
-            Container(
-              margin: const EdgeInsets.all(PulseSpacing.xl),
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(PulseRadius.l),
-                  gradient: const RadialGradient(colors: [Color(0xFF2A3B36), Color(0xFF121A17)])),
-            ),
-            // frame with cut corners
-            SizedBox(width: 240, height: 150,
-                child: CustomPaint(painter: _FramePainter())),
-            Positioned(bottom: 90, left: 0, right: 0,
-                child: Center(child: Container(width: 200, height: 3, decoration: BoxDecoration(color: PulseColors.accent, borderRadius: BorderRadius.circular(2)),
-                    ))),
-            const Positioned(bottom: 40, child: Text('Align the barcode inside the frame.', style: TextStyle(color: Colors.white70, fontSize: 15))),
-          ]),
+  Widget build(BuildContext context) => PulseScaffold(
+        title: 'Scan Barcode',
+        body: EmptyState(
+          icon: Icons.qr_code_scanner_rounded,
+          title: 'Barcode scanning is coming later',
+          body: 'It is not part of this version. You can search the food '
+              'library by name and log anything in a few taps.',
+          actionLabel: 'Search foods',
+          onAction: () => Navigator.of(context).pushReplacementNamed('/food-search'),
         ),
-        Padding(
-          padding: const EdgeInsets.all(PulseSpacing.l),
-          child: Column(children: [
-            SecondaryButton(label: 'Enter barcode manually', icon: Icons.dialpad_rounded, onTap: () async {
-              final code = await pulseSheet<String>(context, builder: (ctx) => const _ManualBarcodeSheet());
-              if (code != null && mounted) setState(() => _state = code.length >= 8 ? _ScanState.found : _ScanState.notFound);
-            }),
-            const SizedBox(height: PulseSpacing.s),
-            // Demo controls simulate recognition outcomes
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              TextButton.icon(onPressed: () { setState(() => _state = _ScanState.processing);
-                    Future.delayed(const Duration(milliseconds: 1200), () => mounted ? setState(() => _state = _ScanState.found) : null); },
-                  icon: const Icon(Icons.check_rounded, color: Colors.white54, size: 16),
-                  label: const Text('Simulate: product found', style: TextStyle(color: Colors.white54))),
-              const SizedBox(width: PulseSpacing.m),
-              TextButton.icon(onPressed: () => setState(() => _state = _ScanState.notFound),
-                  icon: const Icon(Icons.help_outline_rounded, color: Colors.white54, size: 16),
-                  label: const Text('Simulate: not found', style: TextStyle(color: Colors.white54))),
-            ]),
-          ]),
-        ),
-      ]);
-
-  Widget _found() {
-    final f = PulseData.foodById('f8'); // Almonds product example
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(PulseSpacing.l),
-      child: Column(children: [
-        const SizedBox(height: PulseSpacing.l),
-        Row(children: [
-          const Icon(Icons.verified_rounded, color: PulseColors.success, size: 22),
-          const SizedBox(width: PulseSpacing.s),
-          Text('Product found', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white)),
-        ]),
-        const SizedBox(height: PulseSpacing.m),
-        PulseCard(
-          padding: const EdgeInsets.all(PulseSpacing.l),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Nature\'s Best Salted Almonds', style: Theme.of(context).textTheme.titleLarge),
-            const Text('Barcode 0 12345 67890 · Serving 28 g', style: TextStyle(fontSize: 14)),
-            const SizedBox(height: PulseSpacing.m),
-            Row(children: [
-              _num(context, 'Calories', '164'), _num(context, 'Protein', '6 g'), _num(context, 'Carbs', '6 g'), _num(context, 'Fat', '14 g'),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: PulseSpacing.l),
-        PrimaryButton(label: 'Add to Diary', icon: Icons.add_rounded, onTap: () {
-          context.pulse.addFood(f, 1, MealType.snacks);
-          context.pulse.track('barcode_product_logged');
-          Navigator.pop(context);
-          pulseSnack(context, 'Added to Snacks', undoLabel: 'Undo', onUndo: () {});
-        }),
-        TertiaryButton(label: 'Not the right product? Search instead', onTap: () {
-          Navigator.pushReplacementNamed(context, '/food-search');
-        }),
-      ]),
-    );
-  }
-
-  Widget _notFound() => Column(children: [
-        const Spacer(),
-        const Icon(Icons.qr_code_scanner_rounded, size: 56, color: Colors.white38),
-        const SizedBox(height: PulseSpacing.m),
-        Text('We couldn\'t find this product.', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white), textAlign: TextAlign.center),
-        const SizedBox(height: PulseSpacing.s),
-        const Text('It may not be in our database yet. You can add it once and it will be saved to My Foods.',
-            style: TextStyle(color: Colors.white70, fontSize: 15), textAlign: TextAlign.center),
-        const Spacer(),
-        PrimaryButton(label: 'Add Food Manually', onTap: () => Navigator.pushReplacementNamed(context, '/food-search')),
-        const SizedBox(height: PulseSpacing.s),
-        TextButton(onPressed: () => setState(() => _state = _ScanState.scanning),
-            child: const Text('Try scanning again', style: TextStyle(color: Colors.white70))),
-      ]);
-
-  Widget _num(BuildContext c, String l, String v) => Expanded(
-        child: Column(children: [
-          Text(v, style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
-          Text(l, style: Theme.of(c).textTheme.labelSmall),
-        ]),
       );
 }
 
-class _FramePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    const l = 26.0;
-    final r = Offset.zero & size;
-    canvas.drawPath(Path()..moveTo(r.left, r.top + l)..lineTo(r.left, r.top + 10)..quadraticBezierTo(r.left, r.top, r.left + 10, r.top)..lineTo(r.left + l, r.top), p);
-    canvas.drawPath(Path()..moveTo(r.right - l, r.top)..lineTo(r.right - 10, r.top)..quadraticBezierTo(r.right, r.top, r.right, r.top + 10)..lineTo(r.right, r.top + l), p);
-    canvas.drawPath(Path()..moveTo(r.left, r.bottom - l)..lineTo(r.left, r.bottom - 10)..quadraticBezierTo(r.left, r.bottom, r.left + 10, r.bottom)..lineTo(r.left + l, r.bottom), p);
-    canvas.drawPath(Path()..moveTo(r.right - l, r.bottom)..lineTo(r.right - 10, r.bottom)..quadraticBezierTo(r.right, r.bottom, r.right, r.bottom - 10)..lineTo(r.right, r.bottom - l), p);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ManualBarcodeSheet extends StatefulWidget {
-  const _ManualBarcodeSheet();
-  @override
-  State<_ManualBarcodeSheet> createState() => _ManualBarcodeSheetState();
-}
-
-class _ManualBarcodeSheetState extends State<_ManualBarcodeSheet> {
-  final _c = TextEditingController();
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(PulseSpacing.l),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SheetHeader(title: 'Enter barcode manually', subtitle: 'Digits under the stripes on your package.'),
-          TextField(
-              controller: _c, autofocus: true, keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                  labelText: 'UPC / EAN',
-                  errorText: _c.text.isNotEmpty && _c.text.length < 8 ? 'Barcodes are usually 8–13 digits' : null),
-              onChanged: (_) => setState(() {})),
-          const SizedBox(height: PulseSpacing.m),
-          PrimaryButton(label: 'Look up product', onTap: () {
-            if (_c.text.length >= 8) Navigator.pop(context, _c.text);
-          }),
-        ]),
-      );
-}
-
-// ── §24 AI Meal Scan — camera → recognition → review → confirm ─────
 class MealScanScreen extends StatefulWidget {
   const MealScanScreen({super.key});
   @override

@@ -17,15 +17,13 @@ class DiaryScreen extends StatefulWidget {
 }
 
 class _DiaryScreenState extends State<DiaryScreen> {
-  int _dayOffset = 0; // 0 = today (Sep 29); -1 = yesterday etc.
+  int _dayOffset = 0; // 0 = today; -1 = yesterday etc.
   final Set<String> _expanded = {MealType.breakfast.name, MealType.lunch.name};
 
-  String get _dateLabel {
-    if (_dayOffset == 0) return 'Tuesday, Sep 29';
-    if (_dayOffset == -1) return 'Monday, Sep 28';
-    if (_dayOffset == 1) return 'Wednesday, Sep 30';
-    return 'Sep ${29 + _dayOffset}';
-  }
+  /// C1: the date axis was three literals pinned to 29 September, so every
+  /// day of the diary named the wrong one. Derived from the clock instead.
+  DateTime get _date => DateTime.now().add(Duration(days: _dayOffset));
+  String get _dateLabel => fmtMediumDate(_date);
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +32,28 @@ class _DiaryScreenState extends State<DiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: PulseSpacing.m,
+        // §2.1: the two 48 px day-stepper buttons and an unflexed Column
+        // holding a full date label came to 351 px in a 192 px title box.
+        // Diary builds its own AppBar rather than using PulseScaffold, so
+        // the shared title fix did not reach it. The date yields; the
+        // stepper buttons keep their touch targets.
         title: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           IconButton3(icon: Icons.chevron_left_rounded,
               onTap: () => setState(() => _dayOffset--)),
-          Column(children: [
-            Text(_dateLabel, style: Theme.of(context).textTheme.titleLarge),
-            Text(isToday ? 'Today' : _dayOffset < 0 ? '${-_dayOffset} day(s) ago' : 'Upcoming',
-                style: Theme.of(context).textTheme.labelSmall),
-          ]),
+          Expanded(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(_dateLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge),
+              Text(isToday ? 'Today' : _dayOffset < 0 ? '${-_dayOffset} day(s) ago' : 'Upcoming',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall),
+            ]),
+          ),
           IconButton3(icon: Icons.chevron_right_rounded,
               onTap: () => _dayOffset >= 0
                   ? pulseSnack(context, 'You can\'t log into the future yet — plan tomorrow\'s meals in Meal Plan instead.')
@@ -59,7 +71,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
             ? EmptyState(
                 icon: Icons.history_rounded,
                 title: 'No diary for $_dateLabel',
-                body: 'Food logging started on Sep 1. Pick a logged date from the calendar to review it.',
+                body: 'Pick a logged date from the calendar to review it.',
                 actionLabel: 'Open Calendar',
                 onAction: () => pulseSheet(context, builder: (_) => const _HistoryCalendar()))
             : ListView(
@@ -216,7 +228,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
         const SizedBox(height: PulseSpacing.m),
         PrimaryButton(label: 'Save Note', onTap: () {
           Navigator.pop(ctx);
-          if (c.text.trim().isNotEmpty) pulseSnack(context, 'Note saved for Tuesday, Sep 29', icon: Icons.sticky_note_2_rounded);
+          if (c.text.trim().isNotEmpty) pulseSnack(context, 'Note saved for ${fmtMediumDate(DateTime.now())}', icon: Icons.sticky_note_2_rounded);
         }),
       ]),
     ));
@@ -236,11 +248,38 @@ class TodayIcons {
 // ── §79 History calendar with activity dots ────────────────────────
 class _HistoryCalendar extends StatelessWidget {
   const _HistoryCalendar();
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // levels: 0 none, .5 partial, 1 full logging days
-    const levels = <double>[1, 1, .5, 1, 1, 0, 1, 1, .5, 1, 1, 1, .5, 0, 1, 1, 1, .5, 1, 1, 0];
+    final store = context.pulseWatch;
+    final now = DateTime.now();
+    // §3: the intensity of every square came from a hard-coded `levels`
+    // list that repeated every 21 days. Each square now reads the day it
+    // actually represents, and a day never logged is simply empty.
+    final days = <DateTime>[
+      for (var back = 27; back >= 0; back--)
+        DateTime(now.year, now.month, now.day).subtract(Duration(days: back)),
+    ];
+
+    if (store.archive.days.isEmpty) {
+      return const SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(PulseSpacing.l),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            SheetHeader(title: 'Food history', subtitle: 'Fills in as you log'),
+            SizedBox(height: PulseSpacing.l),
+            EmptyState(
+              icon: Icons.calendar_month_rounded,
+              title: 'No history yet',
+              body: 'Each day you log a meal will appear here, shaded by how '
+                  'completely you logged it.',
+            ),
+          ]),
+        ),
+      );
+    }
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(PulseSpacing.l),
@@ -252,23 +291,23 @@ class _HistoryCalendar extends StatelessWidget {
           ]),
           const SizedBox(height: PulseSpacing.s),
           Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.s, children: [
-            for (var i = 1; i <= 28; i++)
-              Semantics(
-                label: 'September $i${_level(levels[(i - 1) % levels.length])}',
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Builder(builder: (_) {
-                    final lv = levels[(i - 1) % levels.length];
-                    return Container(
+            for (final day in days)
+              Builder(builder: (_) {
+                final lv = _completeness(store, day);
+                return Semantics(
+                  label: '${fmtShortDate(day)}${_level(lv)}',
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(
                           color: lv == 0 ? scheme.surfaceContainerHighest : scheme.primary.withOpacity((0.15 + lv * 0.75).clamp(0.0, 1.0).toDouble()),
                           borderRadius: BorderRadius.circular(PulseRadius.s)),
-                      child: Center(child: Text('$i', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: lv > 0.55 ? Colors.white : null))),
-                    );
-                  }),
-                ),
-              ),
+                      child: Center(child: Text('${day.day}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: lv > 0.55 ? Colors.white : null))),
+                    ),
+                  ),
+                );
+              }),
           ]),
           const SizedBox(height: PulseSpacing.m),
           Row(children: [
@@ -283,6 +322,17 @@ class _HistoryCalendar extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  /// How completely a day was logged, against that day's own calorie
+  /// goal: full at 80% of target or more, partial below it, none when
+  /// nothing was recorded.
+  static double _completeness(PulseStore store, DateTime day) {
+    final record = store.archive.forDay(day);
+    if (record == null || !record.logged || record.kcal <= 0) return 0;
+    final goal = store.goals.calorieGoal;
+    if (goal <= 0) return 1;
+    return record.kcal >= goal * 0.8 ? 1 : 0.5;
   }
 }
 
@@ -725,7 +775,7 @@ class NutritionDetailsScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return PulseScaffold(
       title: 'Nutrition',
-      subtitle: 'Tuesday, Sep 29 · ${s.foodKcal.toStringAsFixed(0)} kcal logged',
+      subtitle: '${fmtMediumDate(DateTime.now())} · ${s.foodKcal.toStringAsFixed(0)} kcal logged',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
         // Macro donut with textual explanation (a11y: charts always labelled)
         PulseCard(
