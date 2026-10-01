@@ -29,6 +29,32 @@ String fmtMl(double ml, String unit) => unit == 'oz'
     ? '${(ml / 29.5735).toStringAsFixed(0)} oz'
     : '${ml.toStringAsFixed(0)} ml';
 
+// ── Date formatting (C1) ───────────────────────────────────────────
+// Every screen that needed a date carried its own literal — the greeting
+// read 'Tuesday, September 29' forever and the diary's whole date axis was
+// three hard-coded strings. No intl dependency in this project, so the
+// names live here; `now` is injectable so a test can pin the day (§75).
+
+const kWeekdayNames = <String>['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const kMonthNames = <String>['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+const kMonthAbbrev = <String>['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// 'Tuesday, September 29' — the dashboard greeting line (§16).
+String fmtLongDate(DateTime d) => '${kWeekdayNames[d.weekday - 1]}, ${kMonthNames[d.month - 1]} ${d.day}';
+
+/// 'Tuesday, Sep 29' — the diary and detail headers, where space is tighter.
+String fmtMediumDate(DateTime d) => '${kWeekdayNames[d.weekday - 1]}, ${kMonthAbbrev[d.month - 1]} ${d.day}';
+
+/// 'Sep 29' — chips and ranges.
+String fmtShortDate(DateTime d) => '${kMonthAbbrev[d.month - 1]} ${d.day}';
+
+/// 'Good morning' / 'Good afternoon' / 'Good evening' (§16). The greeting said
+/// morning at every hour, which is a small falsehood of the same kind.
+String fmtGreeting(DateTime d) =>
+    d.hour < 12 ? 'Good morning' : d.hour < 17 ? 'Good afternoon' : 'Good evening';
+
 void pulseTapHaptic() => HapticFeedback.selectionClick();
 
 

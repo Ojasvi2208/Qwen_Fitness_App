@@ -36,7 +36,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     final targetMeal = widget.meal ?? MealType.lunch;
     return PulseScaffold(
       title: 'Add Food',
-      subtitle: 'Logging into ${targetMeal.label.toLowerCase()} · Tuesday, Sep 29',
+      subtitle: 'Logging into ${targetMeal.label.toLowerCase()} · ${fmtMediumDate(DateTime.now())}',
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, PulseSpacing.s),

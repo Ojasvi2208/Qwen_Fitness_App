@@ -26,33 +26,12 @@ class TrainScreen extends StatelessWidget {
         ]),
         const SizedBox(height: PulseSpacing.l),
         // Today's workout hero — Card/WorkoutHero
-        PulseCard(
-          padding: const EdgeInsets.all(PulseSpacing.l),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('TODAY\'S WORKOUT', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
-            const SizedBox(height: 4),
-            Text('Upper Body Strength', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: PulseSpacing.xs),
-            const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.schedule_rounded, size: 16), SizedBox(width: 4), Text('45 min', style: TextStyle(fontSize: 15)),
-              ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.leaderboard_rounded, size: 16), SizedBox(width: 4), Text('Intermediate', style: TextStyle(fontSize: 15)),
-              ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.bolt_rounded, size: 16), SizedBox(width: 4), Text('8 exercises', style: TextStyle(fontSize: 15)),
-              ]),
-            ]),
-            const SizedBox(height: PulseSpacing.m),
-            PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
-              context.pulse.startWorkout('Upper Body Strength');
-              Navigator.of(context).pushNamed('/active-workout', arguments: 'Upper Body Strength');
-            }),
-            const SizedBox(height: PulseSpacing.s),
-            Center(child: Text('Planned for 6:30 PM · you can start any time', style: Theme.of(context).textTheme.labelSmall)),
-          ]),
-        ),
+        // C1: the duration, level and exercise count were typed into the card
+        // ('45 min', 'Intermediate', '8 exercises') beside a hard-coded name,
+        // so they would keep claiming those figures after the template changed.
+        // All four now read the template, and the card is labelled a
+        // suggestion: nothing schedules a workout, so '6:30 PM' was invented.
+        _todayWorkoutCard(context, WorkoutTemplates.library.first),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Recommended for You', actionLabel: 'See all', onAction: () => Navigator.of(context).pushNamed('/workout-library')),
         SizedBox(
@@ -80,6 +59,38 @@ class TrainScreen extends StatelessWidget {
       ]),
     );
   }
+
+  /// Reads every figure from [t] so the hero cannot drift from the template.
+  Widget _todayWorkoutCard(BuildContext context, WorkoutTemplate t) => PulseCard(
+        padding: const EdgeInsets.all(PulseSpacing.l),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('SUGGESTED WORKOUT', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
+          const SizedBox(height: 4),
+          Text(t.name, style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: PulseSpacing.xs),
+          Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.schedule_rounded, size: 16), const SizedBox(width: 4),
+              Text('${t.minutes} min', style: const TextStyle(fontSize: 15)),
+            ]),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.leaderboard_rounded, size: 16), const SizedBox(width: 4),
+              Text(t.level.label, style: const TextStyle(fontSize: 15)),
+            ]),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.bolt_rounded, size: 16), const SizedBox(width: 4),
+              Text('${t.plan.length} exercises', style: const TextStyle(fontSize: 15)),
+            ]),
+          ]),
+          const SizedBox(height: PulseSpacing.m),
+          PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {
+            context.pulse.startWorkout(t.name);
+            Navigator.of(context).pushNamed('/active-workout', arguments: t.name);
+          }),
+          const SizedBox(height: PulseSpacing.s),
+          Center(child: Text('Start it whenever you like', style: Theme.of(context).textTheme.labelSmall)),
+        ]),
+      );
 
   Widget _recCard(BuildContext c, ({String name, int minutes, String level, String category, int exercises, int kcal, List<String> equipment}) w) => SizedBox(
         width: 190,

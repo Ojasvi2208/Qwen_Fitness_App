@@ -17,15 +17,13 @@ class DiaryScreen extends StatefulWidget {
 }
 
 class _DiaryScreenState extends State<DiaryScreen> {
-  int _dayOffset = 0; // 0 = today (Sep 29); -1 = yesterday etc.
+  int _dayOffset = 0; // 0 = today; -1 = yesterday etc.
   final Set<String> _expanded = {MealType.breakfast.name, MealType.lunch.name};
 
-  String get _dateLabel {
-    if (_dayOffset == 0) return 'Tuesday, Sep 29';
-    if (_dayOffset == -1) return 'Monday, Sep 28';
-    if (_dayOffset == 1) return 'Wednesday, Sep 30';
-    return 'Sep ${29 + _dayOffset}';
-  }
+  /// C1: the date axis was three literals pinned to 29 September, so every
+  /// day of the diary named the wrong one. Derived from the clock instead.
+  DateTime get _date => DateTime.now().add(Duration(days: _dayOffset));
+  String get _dateLabel => fmtMediumDate(_date);
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +57,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
             ? EmptyState(
                 icon: Icons.history_rounded,
                 title: 'No diary for $_dateLabel',
-                body: 'Food logging started on Sep 1. Pick a logged date from the calendar to review it.',
+                body: 'Pick a logged date from the calendar to review it.',
                 actionLabel: 'Open Calendar',
                 onAction: () => pulseSheet(context, builder: (_) => const _HistoryCalendar()))
             : ListView(
@@ -216,7 +214,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
         const SizedBox(height: PulseSpacing.m),
         PrimaryButton(label: 'Save Note', onTap: () {
           Navigator.pop(ctx);
-          if (c.text.trim().isNotEmpty) pulseSnack(context, 'Note saved for Tuesday, Sep 29', icon: Icons.sticky_note_2_rounded);
+          if (c.text.trim().isNotEmpty) pulseSnack(context, 'Note saved for ${fmtMediumDate(DateTime.now())}', icon: Icons.sticky_note_2_rounded);
         }),
       ]),
     ));
@@ -725,7 +723,7 @@ class NutritionDetailsScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return PulseScaffold(
       title: 'Nutrition',
-      subtitle: 'Tuesday, Sep 29 · ${s.foodKcal.toStringAsFixed(0)} kcal logged',
+      subtitle: '${fmtMediumDate(DateTime.now())} · ${s.foodKcal.toStringAsFixed(0)} kcal logged',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
         // Macro donut with textual explanation (a11y: charts always labelled)
         PulseCard(

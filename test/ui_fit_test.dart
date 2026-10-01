@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pulse_app/data/pulse_store.dart';
+import 'package:pulse_app/data/workout_session.dart';
 import 'package:pulse_app/main.dart';
 import 'package:pulse_app/theme/pulse_theme.dart';
 import 'package:pulse_app/widgets/common.dart';
@@ -69,6 +70,69 @@ void main() {
       // The defect was an avatar reading 'AM' beside the name 'Ojasvi'.
       expect(find.text('OM'), findsOneWidget);
       expect(find.text('AM'), findsNothing);
+    });
+  });
+
+  group('C1 no fabricated data', () {
+    test('date formatting follows the clock, not a literal', () {
+      final d = DateTime(2026, 10, 1); // a Thursday
+      expect(fmtLongDate(d), 'Thursday, October 1');
+      expect(fmtMediumDate(d), 'Thursday, Oct 1');
+      expect(fmtShortDate(d), 'Oct 1');
+    });
+
+    test('the greeting follows the hour', () {
+      expect(fmtGreeting(DateTime(2026, 10, 1, 8)), 'Good morning');
+      expect(fmtGreeting(DateTime(2026, 10, 1, 14)), 'Good afternoon');
+      expect(fmtGreeting(DateTime(2026, 10, 1, 21)), 'Good evening');
+    });
+
+    testWidgets('a fresh install states no figure it did not record',
+        (tester) async {
+      final store = PulseStore();
+      store.userName = 'Ojasvi Malik';
+      store.userFirstName = 'Ojasvi';
+      await _sizeTo(tester, kMotoSize);
+      await tester.pumpWidget(_host(store, const PulseShell()));
+      await tester.pumpAndSettle();
+
+      // Nothing has been logged, so no screen may claim a week of activity.
+      expect(store.hasAnyData, isFalse, reason: 'precondition');
+      for (final fiction in ['6,842 / 8,000', '1.7 / 2.6 L', '6,932', '2,140']) {
+        expect(find.textContaining(fiction), findsNothing,
+            reason: '$fiction was typed into the source, never recorded');
+      }
+      // The insight strip asserted a protein streak on an empty profile.
+      expect(find.textContaining('5 of the last 7 days'), findsNothing);
+    });
+
+    testWidgets('the dashboard names today, not 29 September', (tester) async {
+      final store = PulseStore();
+      store.userName = 'Ojasvi Malik';
+      store.userFirstName = 'Ojasvi';
+      await _sizeTo(tester, kMotoSize);
+      await tester.pumpWidget(_host(store, const PulseShell()));
+      await tester.pumpAndSettle();
+      expect(find.text(fmtLongDate(DateTime.now())), findsOneWidget);
+      expect(find.text('Tuesday, September 29'), findsNothing);
+    });
+
+    testWidgets('the suggested workout reads the template it starts',
+        (tester) async {
+      final store = PulseStore();
+      store.userName = 'Ojasvi Malik';
+      store.userFirstName = 'Ojasvi';
+      await _sizeTo(tester, kMotoSize);
+      await tester.pumpWidget(_host(store, const PulseShell(initialTab: 2)));
+      await tester.pumpAndSettle();
+
+      // The figures must agree with the library entry rather than restate it.
+      final t = WorkoutTemplates.library.first;
+      expect(find.text(t.name), findsWidgets);
+      expect(find.text('${t.minutes} min'), findsOneWidget);
+      expect(find.text('${t.plan.length} exercises'), findsOneWidget);
+      // Nothing schedules a workout, so no clock time may be promised.
+      expect(find.textContaining('6:30 PM'), findsNothing);
     });
   });
 

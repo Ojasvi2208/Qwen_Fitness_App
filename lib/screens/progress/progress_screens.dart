@@ -303,14 +303,18 @@ class NutritionProgressScreen extends StatelessWidget {
         SectionHeader(title: 'Calories'),
         PulseCard(
           child: Column(children: [
-            PulseBarChart(values: const [1980, 2210, 2050, 2340, 1890, 2100, 2080], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 2050, highlightIndex: 6),
+            // C1: seven const bars presented as the user's week, with a
+            // '7-day average' computed from them. No daily calorie history is
+            // kept, so only the goal below is a real number.
+            const EmptyState(
+                icon: Icons.bar_chart_rounded,
+                title: 'Your calorie week is building',
+                body: 'Each logged day adds a bar here, measured against your goal.'),
             const SizedBox(height: PulseSpacing.s),
             Row(children: [
-              Expanded(child: _avg(context, 'Goal average', '2,050 kcal')),
-              Expanded(child: _avg(context, '7-day average', '2,084 kcal')),
+              Expanded(child: _avg(context, 'Goal', '${store.goals.calorieGoal.toStringAsFixed(0)} kcal')),
+              Expanded(child: _avg(context, 'Logged today', '${store.foodKcal.toStringAsFixed(0)} kcal')),
             ]),
-            Text('Bars above the dashed goal line mean surplus days — three of seven were within ±5% of target.',
-                style: Theme.of(context).textTheme.bodySmall),
           ]),
         ),
         const SizedBox(height: PulseSpacing.l),
@@ -393,21 +397,26 @@ class ActivityProgressScreen extends StatelessWidget {
       title: 'Activity Progress',
       subtitle: 'Steps · burn · workouts — last 7 days',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
-        PulseCard(
-          child: Column(children: [
-            PulseBarChart(values: const [5760, 7600, 4880, 8000, 7040, 3600, 6842], labels: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'], goal: 8000),
-            const SizedBox(height: PulseSpacing.s),
-            Text('You hit your step goal on 2 of 7 days. Weekends dip most — a Sunday walk habit could fix that.',
-                style: TextStyle(fontSize: 14.5, height: 1.4, color: scheme.onSurface)),
-          ]),
+        // C1: this chart's seven bars and the prose beneath them were a const
+        // list — a week the user never walked. Nothing records step history
+        // (the store holds only stepsToday), so there is no honest series to
+        // draw; StepsScreen's empty state is the pattern this follows.
+        const PulseCard(
+          child: EmptyState(
+              icon: Icons.bar_chart_rounded,
+              title: 'Your weekly pattern is building',
+              body: 'Each day of recorded steps adds a bar here, measured against your daily goal.'),
         ),
         const SizedBox(height: PulseSpacing.m),
+        // C1: 'Daily average 6,932' and 'Active calories 2,140' were literals.
+        // Workouts is a real counter, so it stays; the other two derive from
+        // today's steps and are named as today, not as a weekly average.
         Row(children: [
-          Expanded(child: _mini(context, 'Daily average', '6,932', 'steps')),
+          Expanded(child: _mini(context, 'Steps today', store.stepsToday.toStringAsFixed(0), 'steps')),
           const SizedBox(width: PulseSpacing.s),
-          Expanded(child: _mini(context, 'Active calories', '2,140', 'kcal burned')),
+          Expanded(child: _mini(context, 'Active calories', '${(store.stepsToday * 0.04).round()}', 'kcal burned')),
           const SizedBox(width: PulseSpacing.s),
-          Expanded(child: _mini(context, 'Workouts', '4', 'completed')),
+          Expanded(child: _mini(context, 'Workouts', '${store.workoutsCompletedToday}', 'completed today')),
         ]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'This month vs last'),
