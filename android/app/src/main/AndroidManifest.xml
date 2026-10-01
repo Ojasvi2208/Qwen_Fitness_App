@@ -5,7 +5,7 @@
          install time: the app still asks at the moment the user creates one. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="pulse_app"
+        android:label="PulseFit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
