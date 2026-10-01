@@ -53,9 +53,12 @@ class PrimaryButton extends StatelessWidget {
           ? const SizedBox(
               width: 22, height: 22,
               child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+          // O6 §2.1: the label is caller-supplied and unbounded, so at a
+          // large text scale it pushed the row past the button. The icon
+          // keeps its space; the label yields, as D6 settled it.
           : Row(mainAxisSize: MainAxisSize.min, children: [
               if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: PulseSpacing.s)],
-              Text(label),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
             ]),
     );
   }
