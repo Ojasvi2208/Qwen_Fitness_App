@@ -168,14 +168,42 @@ class WeightProgressScreen extends StatelessWidget {
               child: PulseLineChart(points: store.weightSeries, height: 190, color: scheme.primary, goalY: store.goals.targetWeightKg),
             ),
             const SizedBox(height: PulseSpacing.s),
-            Row(children: [
-              Container(width: 14, height: 3, color: scheme.primary),
-              const SizedBox(width: 6),
-              Text('Your weight trend', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(width: PulseSpacing.l),
-              Container(width: 14, height: 0, decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.primary.withOpacity(0.4), width: 1.4)))),
-              const SizedBox(width: 6),
-              Text('Goal 75 kg', style: Theme.of(context).textTheme.labelMedium),
+            // O5 §2.1: two swatch+label pairs with a fixed gap came to 406 px
+            // in a 255 px card and failed on the tablet too, so this is not a
+            // narrow-screen problem — the pairs wrap instead of shrinking.
+            // The goal also read a hard-coded "75 kg" for every user; it is
+            // the user's own target, and absent until they set one.
+            Wrap(spacing: PulseSpacing.l, runSpacing: PulseSpacing.xs, children: [
+              // Bounded like pulseMetaChip: the swatch keeps its width and
+              // the label ellipsises, so a large text scale cannot push the
+              // pair past the Wrap's line.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 220),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 14, height: 3, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text('Your weight trend',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium),
+                  ),
+                ]),
+              ),
+              if (store.goals.targetWeightKg > 0)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 14, height: 0, decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.primary.withOpacity(0.4), width: 1.4)))),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text('Goal ${fmtKg(store.goals.targetWeightKg, store.unitsWeight)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium),
+                    ),
+                  ]),
+                ),
             ]),
           ]),
         ),
@@ -1047,29 +1075,57 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 Text('Your weight and activity have changed since your plan was created. We suggest reviewing — your current targets stay exactly as they are until you confirm.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14.5, height: 1.45)),
                 const SizedBox(height: PulseSpacing.sm),
-                Row(children: [
+                // O3 §2.1: "Review Plan" and "Keep Current Plan" are 510 px of
+                // button in a 256 px card on a small screen, and neither label
+                // can shrink without becoming a different instruction. They
+                // wrap onto a second line instead.
+                Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.xs, children: [
                   FilledButton(onPressed: () => Navigator.of(context).pushNamed('/goal-editor'), child: const Text('Review Plan')),
-                  const SizedBox(width: PulseSpacing.s),
                   TextButton(onPressed: () => setState(() => _showAdjust = false), child: const Text('Keep Current Plan')),
                 ]),
               ]),
             ),
           ),
         const SizedBox(height: PulseSpacing.s),
+        // O1+O2 §2.1: this was a ListTile whose `title` and `trailing` were
+        // laid out against no shared width budget, so at a large text scale
+        // the label and the value each claimed the full row and the pair
+        // overflowed. One fix, not two: the label and the value are now
+        // siblings in a single Row that divides the space between them —
+        // the label yields first, the value keeps what it needs.
         for (final g in goals)
           Card(
-            child: ListTile(
-              leading: Icon(g.icon, color: scheme.onSurface.withOpacity(0.6)),
-              title: Text(g.label, style: Theme.of(context).textTheme.titleMedium),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(g.value, style: PulseTypography.metricSmall.copyWith(color: scheme.primary, fontSize: 17)),
-                const SizedBox(width: PulseSpacing.s),
-                Icon(Icons.edit_outlined, size: 18, color: scheme.onSurface.withOpacity(0.4)),
-              ]),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(PulseRadius.m),
               onTap: () {
                 store.track('goal_updated_opened');
                 Navigator.of(context).pushNamed(g.route, arguments: g.label);
               },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: PulseSpacing.m, vertical: PulseSpacing.m),
+                child: Row(children: [
+                  Icon(g.icon, color: scheme.onSurface.withOpacity(0.6)),
+                  const SizedBox(width: PulseSpacing.m),
+                  Expanded(
+                    child: Text(g.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  const SizedBox(width: PulseSpacing.s),
+                  Flexible(
+                    child: Text(g.value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: PulseTypography.metricSmall
+                            .copyWith(color: scheme.primary, fontSize: 17)),
+                  ),
+                  const SizedBox(width: PulseSpacing.s),
+                  Icon(Icons.edit_outlined, size: 18, color: scheme.onSurface.withOpacity(0.4)),
+                ]),
+              ),
             ),
           ),
         const SizedBox(height: PulseSpacing.m),

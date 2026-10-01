@@ -68,19 +68,13 @@ class TrainScreen extends StatelessWidget {
           const SizedBox(height: 4),
           Text(t.name, style: Theme.of(context).textTheme.displaySmall),
           const SizedBox(height: PulseSpacing.xs),
+          // O7+O8 §2.1: the Wrap wraps, but each inner Row had an unbounded
+          // Text and mainAxisSize.min, so a single item could still exceed
+          // the line at a large text scale. pulseMetaChip bounds the label.
           Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.xs, children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.schedule_rounded, size: 16), const SizedBox(width: 4),
-              Text('${t.minutes} min', style: const TextStyle(fontSize: 15)),
-            ]),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.leaderboard_rounded, size: 16), const SizedBox(width: 4),
-              Text(t.level.label, style: const TextStyle(fontSize: 15)),
-            ]),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.bolt_rounded, size: 16), const SizedBox(width: 4),
-              Text('${t.plan.length} exercises', style: const TextStyle(fontSize: 15)),
-            ]),
+            pulseMetaChip(Icons.schedule_rounded, '${t.minutes} min'),
+            pulseMetaChip(Icons.leaderboard_rounded, t.level.label),
+            pulseMetaChip(Icons.bolt_rounded, '${t.plan.length} exercises'),
           ]),
           const SizedBox(height: PulseSpacing.m),
           PrimaryButton(label: 'Start Workout', icon: Icons.play_arrow_rounded, onTap: () {

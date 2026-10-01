@@ -136,8 +136,16 @@ class SubscriptionScreen extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.fromLTRB(PulseSpacing.m, 0, PulseSpacing.m, PulseSpacing.huge), children: [
         PulseCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // O9 §2.1: the plan name and the badge shared no width budget,
+            // so at a large text scale the pair ran past the card. The name
+            // yields; the badge keeps its size.
             Row(children: [
-              Text(store.premium ? 'PULSE Pro' : 'PULSE Free', style: Theme.of(context).textTheme.headlineSmall),
+              Flexible(
+                child: Text(store.premium ? 'PULSE Pro' : 'PULSE Free',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall),
+              ),
               const SizedBox(width: PulseSpacing.s),
               if (store.premium) const ProBadge(),
             ]),

@@ -70,6 +70,28 @@ void pulseSnack(BuildContext context, String message, {String? undoLabel, VoidCa
     PulseToast.show(context, message, undoLabel: undoLabel, onUndo: onUndo, icon: icon);
 
 /// Nav/Top — standard screen scaffold with back button & actions.
+/// §2.1 — an icon + label pair for a `Wrap` of metadata.
+///
+/// A bare `Row(mainAxisSize: min)` inside a `Wrap` still overflows when its
+/// own label is wider than the line, because `min` shrinks to the children
+/// rather than to the available width. [maxWidth] bounds it so the label
+/// ellipsises instead, and the icon always keeps its space.
+Widget pulseMetaChip(IconData icon, String label,
+        {double maxWidth = 220, double fontSize = 15}) =>
+    ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: fontSize)),
+        ),
+      ]),
+    );
+
 class PulseScaffold extends StatelessWidget {
   const PulseScaffold({super.key, required this.title, required this.body, this.actions, this.bottomBar,
       this.floatingAction, this.floatingActionButton, this.onBack, this.subtitle});
@@ -86,10 +108,18 @@ class PulseScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title),
+        // §2.1: the title block sat unbounded between the back button and
+        // the actions, so a long subtitle pushed the app bar 159 px past
+        // its box on a 320 px screen. Both lines ellipsise rather than
+        // overflow — this is the shared scaffold, so every screen with a
+        // subtitle was failing on it.
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
           if (subtitle != null)
-            Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
+            Text(subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
         ]),
         leading: onBack != null || Navigator.of(context).canPop()
             ? IconButton(
@@ -374,11 +404,18 @@ class TrendIndicator extends StatelessWidget {
     final color = good ? PulseColors.success : PulseColors.warning;
     return Semantics(
       label: '${positive ? 'Up' : 'Down'} ${v.abs().toStringAsFixed(1)}$unit $label',
+      // O4 §2.1: the label is caller-supplied ("+1.2 kg this month") and
+      // unbounded, so it ran 176 px past an 82 px box. The arrow keeps its
+      // space; the text yields. Semantics above still reads it in full.
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 14, color: color),
         const SizedBox(width: 2),
-        Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600).copyWith(color: color)),
+        Flexible(
+          child: Text('${positive ? '+' : '−'}${v.abs().toStringAsFixed(1)}$unit${label.isEmpty ? '' : ' $label'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600).copyWith(color: color)),
+        ),
       ]),
     );
   }

@@ -32,14 +32,28 @@ class _DiaryScreenState extends State<DiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: PulseSpacing.m,
+        // §2.1: the two 48 px day-stepper buttons and an unflexed Column
+        // holding a full date label came to 351 px in a 192 px title box.
+        // Diary builds its own AppBar rather than using PulseScaffold, so
+        // the shared title fix did not reach it. The date yields; the
+        // stepper buttons keep their touch targets.
         title: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           IconButton3(icon: Icons.chevron_left_rounded,
               onTap: () => setState(() => _dayOffset--)),
-          Column(children: [
-            Text(_dateLabel, style: Theme.of(context).textTheme.titleLarge),
-            Text(isToday ? 'Today' : _dayOffset < 0 ? '${-_dayOffset} day(s) ago' : 'Upcoming',
-                style: Theme.of(context).textTheme.labelSmall),
-          ]),
+          Expanded(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(_dateLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge),
+              Text(isToday ? 'Today' : _dayOffset < 0 ? '${-_dayOffset} day(s) ago' : 'Upcoming',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall),
+            ]),
+          ),
           IconButton3(icon: Icons.chevron_right_rounded,
               onTap: () => _dayOffset >= 0
                   ? pulseSnack(context, 'You can\'t log into the future yet — plan tomorrow\'s meals in Meal Plan instead.')
