@@ -24,7 +24,7 @@ class ProfileScreen extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed('/personal-details'),
           child: Row(children: [
             Stack(alignment: Alignment.bottomRight, children: [
-              const PulseAvatar(radius: 30, initials: 'AM', showPhoto: false),
+              PulseAvatar(radius: 30, initials: pulseInitials(store.userName), showPhoto: false),
               Container(width: 20, height: 20, decoration: BoxDecoration(color: scheme.surface, shape: BoxShape.circle, border: Border.all(color: scheme.surface)),
                   child: Icon(Icons.edit_rounded, size: 11, color: scheme.onSurface.withOpacity(0.6))),
             ]),

@@ -61,7 +61,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget _greeting(BuildContext context, PulseStore store) => Padding(
         padding: const EdgeInsets.fromLTRB(PulseSpacing.xs, PulseSpacing.s, 0, PulseSpacing.l),
         child: Row(children: [
-          const PulseAvatar(radius: 22),
+          PulseAvatar(radius: 22, initials: pulseInitials(store.userName)),
           const SizedBox(width: PulseSpacing.sm),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

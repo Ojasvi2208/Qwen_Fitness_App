@@ -342,7 +342,10 @@ class _PulseShellState extends State<PulseShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _tab, children: pages),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      // D2: centerDocked over a five-destination NavigationBar put the FAB on
+      // top of the middle tab — Train — hiding its icon and label. endFloat
+      // keeps all five tabs reachable; the bar's own padding clears the FAB.
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: FloatingActionButton(

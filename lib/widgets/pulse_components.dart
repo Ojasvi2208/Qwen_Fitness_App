@@ -303,11 +303,14 @@ class MacroRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: PulseSpacing.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // D6: label + value were both unconstrained, so a 360 px screen
+        // overflowed this row by 62 px. The label yields first (it is the
+        // repeated word); the value keeps its space because it is the number.
         Row(children: [
           Icon(iconData, size: 16, color: color),
           const SizedBox(width: PulseSpacing.s),
-          Text(label, style: theme.textTheme.titleMedium),
-          const Spacer(),
+          Expanded(child: Text(label, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: PulseSpacing.s),
           Text('${current.toStringAsFixed(0)} / ${goal.toStringAsFixed(0)} $unit',
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
         ]),

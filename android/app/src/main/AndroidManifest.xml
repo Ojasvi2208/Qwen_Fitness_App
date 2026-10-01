@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 13+ (API 33) refuses the runtime notification request unless the
+         permission is declared, so requestPermission() could never succeed and
+         reminders (§55) could never be granted. Declared here, not requested at
+         install time: the app still asks at the moment the user creates one. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="pulse_app"
         android:name="${applicationName}"
