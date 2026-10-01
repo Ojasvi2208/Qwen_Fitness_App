@@ -73,6 +73,9 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
       }
       await _store.attachPersistence(repo,
           reminderScheduler: kUsePlatformServices ? _scheduler() : null);
+      // §3: a snapshot can be days old. File whatever day it describes
+      // before any screen reads today's figures as current.
+      _store.rolloverIfNeeded();
     } catch (e) {
       // Persistence failure must never block the app (§74 error posture).
       debugPrint('PULSE persistence unavailable: $e');
@@ -109,6 +112,9 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
     // entitlements (and ad visibility) are correct without waiting for a tap.
     if (state == AppLifecycleState.resumed) {
       _store.settleSubscription();
+      // §3: the app is routinely left open across midnight — roll the
+      // day over on resume so today's figures are actually today's.
+      _store.rolloverIfNeeded();
     }
   }
 

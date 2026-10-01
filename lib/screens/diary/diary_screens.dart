@@ -234,11 +234,38 @@ class TodayIcons {
 // ── §79 History calendar with activity dots ────────────────────────
 class _HistoryCalendar extends StatelessWidget {
   const _HistoryCalendar();
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // levels: 0 none, .5 partial, 1 full logging days
-    const levels = <double>[1, 1, .5, 1, 1, 0, 1, 1, .5, 1, 1, 1, .5, 0, 1, 1, 1, .5, 1, 1, 0];
+    final store = context.pulseWatch;
+    final now = DateTime.now();
+    // §3: the intensity of every square came from a hard-coded `levels`
+    // list that repeated every 21 days. Each square now reads the day it
+    // actually represents, and a day never logged is simply empty.
+    final days = <DateTime>[
+      for (var back = 27; back >= 0; back--)
+        DateTime(now.year, now.month, now.day).subtract(Duration(days: back)),
+    ];
+
+    if (store.archive.days.isEmpty) {
+      return const SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(PulseSpacing.l),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            SheetHeader(title: 'Food history', subtitle: 'Fills in as you log'),
+            SizedBox(height: PulseSpacing.l),
+            EmptyState(
+              icon: Icons.calendar_month_rounded,
+              title: 'No history yet',
+              body: 'Each day you log a meal will appear here, shaded by how '
+                  'completely you logged it.',
+            ),
+          ]),
+        ),
+      );
+    }
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(PulseSpacing.l),
@@ -250,23 +277,23 @@ class _HistoryCalendar extends StatelessWidget {
           ]),
           const SizedBox(height: PulseSpacing.s),
           Wrap(spacing: PulseSpacing.s, runSpacing: PulseSpacing.s, children: [
-            for (var i = 1; i <= 28; i++)
-              Semantics(
-                label: 'September $i${_level(levels[(i - 1) % levels.length])}',
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Builder(builder: (_) {
-                    final lv = levels[(i - 1) % levels.length];
-                    return Container(
+            for (final day in days)
+              Builder(builder: (_) {
+                final lv = _completeness(store, day);
+                return Semantics(
+                  label: '${fmtShortDate(day)}${_level(lv)}',
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(
                           color: lv == 0 ? scheme.surfaceContainerHighest : scheme.primary.withOpacity((0.15 + lv * 0.75).clamp(0.0, 1.0).toDouble()),
                           borderRadius: BorderRadius.circular(PulseRadius.s)),
-                      child: Center(child: Text('$i', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: lv > 0.55 ? Colors.white : null))),
-                    );
-                  }),
-                ),
-              ),
+                      child: Center(child: Text('${day.day}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: lv > 0.55 ? Colors.white : null))),
+                    ),
+                  ),
+                );
+              }),
           ]),
           const SizedBox(height: PulseSpacing.m),
           Row(children: [
@@ -281,6 +308,17 @@ class _HistoryCalendar extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  /// How completely a day was logged, against that day's own calorie
+  /// goal: full at 80% of target or more, partial below it, none when
+  /// nothing was recorded.
+  static double _completeness(PulseStore store, DateTime day) {
+    final record = store.archive.forDay(day);
+    if (record == null || !record.logged || record.kcal <= 0) return 0;
+    final goal = store.goals.calorieGoal;
+    if (goal <= 0) return 1;
+    return record.kcal >= goal * 0.8 ? 1 : 0.5;
   }
 }
 

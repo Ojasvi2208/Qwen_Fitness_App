@@ -122,6 +122,20 @@ void main() {
       expect(archive.streakAsOf(DateTime(2026, 9, 30)), 1);
     });
 
+    test('a conditional streak counts only days meeting the condition', () {
+      // Hydration and workout streaks ask a different question from
+      // "did the user log at all" — a logged day that missed the water
+      // goal breaks the water streak without breaking the logging one.
+      final archive = DayArchive();
+      archive.record(const DayRecord(date: '2026-09-28', waterLiters: 2.6, logged: true));
+      archive.record(const DayRecord(date: '2026-09-29', waterLiters: 0.5, logged: true));
+      archive.record(const DayRecord(date: '2026-09-30', waterLiters: 2.8, logged: true));
+      final now = DateTime(2026, 9, 30);
+      expect(archive.streakWhere((d) => d.waterLiters >= 2.5, now), 1,
+          reason: 'the 29th missed the goal, so the 28th cannot count');
+      expect(archive.streakAsOf(now), 3, reason: 'but all three were logged');
+    });
+
     test('a streak that ended yesterday is not a current streak', () {
       final archive = DayArchive();
       archive.record(const DayRecord(date: '2026-09-27', logged: true));

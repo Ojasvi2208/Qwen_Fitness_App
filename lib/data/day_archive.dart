@@ -152,6 +152,28 @@ class DayArchive {
     return streak;
   }
 
+  /// Consecutive days satisfying [test], ending today or yesterday —
+  /// the hydration and workout streaks, which are not the same question
+  /// as "did the user log anything at all".
+  int streakWhere(bool Function(DayRecord) test, DateTime now) {
+    bool holds(DateTime d) {
+      final record = forDay(d);
+      return record != null && record.logged && test(record);
+    }
+
+    var cursor = DateTime(now.year, now.month, now.day);
+    if (!holds(cursor)) {
+      cursor = cursor.subtract(const Duration(days: 1));
+      if (!holds(cursor)) return 0;
+    }
+    var streak = 0;
+    while (holds(cursor)) {
+      streak += 1;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
   /// Streak against the latest day the archive holds — used where no
   /// clock is to hand, such as a value object read in a test.
   int get currentStreak {

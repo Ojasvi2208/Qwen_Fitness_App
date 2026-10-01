@@ -50,6 +50,14 @@ String fmtMediumDate(DateTime d) => '${kWeekdayNames[d.weekday - 1]}, ${kMonthAb
 /// 'Sep 29' — chips and ranges.
 String fmtShortDate(DateTime d) => '${kMonthAbbrev[d.month - 1]} ${d.day}';
 
+/// '8:10 AM' — timestamps on individual logged entries (§3), where the
+/// water screen previously printed invented times.
+String fmtClockTime(DateTime d) {
+  final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final minute = d.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${d.hour < 12 ? 'AM' : 'PM'}';
+}
+
 /// 'Good morning' / 'Good afternoon' / 'Good evening' (§16). The greeting said
 /// morning at every hour, which is a small falsehood of the same kind.
 String fmtGreeting(DateTime d) =>

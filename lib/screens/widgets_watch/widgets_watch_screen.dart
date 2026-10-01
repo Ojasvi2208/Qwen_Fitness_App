@@ -15,34 +15,40 @@ class WidgetsWatchScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final store = context.pulseWatch;
+    // §3: every tile below carried a literal — "6,842 / 8,000" steps for
+    // a user who had taken none. These are previews of the real widgets,
+    // so they must preview the real numbers.
+    final g = store.goals;
+    double pct(double v, double goal) => goal <= 0 ? 0 : (v / goal).clamp(0.0, 1.0);
+
     return PulseScaffold(
       title: 'Widgets & Watch',
       subtitle: 'At-a-glance status without opening PULSE',
       body: ListView(padding: const EdgeInsets.all(PulseSpacing.m), children: [
         SectionHeader(title: 'Home-screen widgets'),
         // Small widgets row
-        Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.m, children: const [
-          _WidgetSmall(label: 'Calories', value: '1,340 / 2,050', pct: 0.65, color: PulseColors.accent, icon: Icons.local_fire_department_rounded),
-          _WidgetSmall(label: 'Protein', value: '92 / 135 g', pct: 0.68, color: PulseColors.protein, icon: Icons.bolt_rounded),
-          _WidgetSmall(label: 'Steps', value: '6,842 / 8,000', pct: 0.86, color: PulseColors.steps, icon: Icons.directions_walk_rounded),
-          _WidgetSmall(label: 'Water', value: '1.7 / 2.6 L', pct: 0.65, color: PulseColors.water, icon: Icons.water_drop_rounded),
+        Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.m, children: [
+          _WidgetSmall(label: 'Calories', value: '${store.foodKcal.round()} / ${g.calorieGoal.round()}', pct: pct(store.foodKcal, g.calorieGoal), color: PulseColors.accent, icon: Icons.local_fire_department_rounded),
+          _WidgetSmall(label: 'Protein', value: '${store.protein.round()} / ${g.proteinGoal.round()} g', pct: pct(store.protein, g.proteinGoal), color: PulseColors.protein, icon: Icons.bolt_rounded),
+          _WidgetSmall(label: 'Steps', value: '${store.stepsToday.round()} / ${g.stepGoal}', pct: pct(store.stepsToday, g.stepGoal.toDouble()), color: PulseColors.steps, icon: Icons.directions_walk_rounded),
+          _WidgetSmall(label: 'Water', value: '${store.waterLogged.toStringAsFixed(1)} / ${g.waterGoalLiters.toStringAsFixed(1)} L', pct: pct(store.waterLogged, g.waterGoalLiters), color: PulseColors.water, icon: Icons.water_drop_rounded),
         ]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Medium · progress + quick log'),
-        const _WidgetMedium(),
+        _WidgetMedium(store: store),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Large · full day at a glance'),
-        const _WidgetLarge(),
+        _WidgetLarge(store: store),
         const SizedBox(height: PulseSpacing.xl),
         Divider(color: scheme.onSurface.withOpacity(0.12)),
         SectionHeader(title: 'Watch experience'),
-        const Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.m, children: [
-          _WatchTile(title: 'Calories', lines: ['1,340 kcal', '1,020 left'], ring: 0.65, ringColor: PulseColors.accent),
-          _WatchTile(title: 'Macros', lines: ['Protein', '92 / 135 g', '+10 g'], ring: 0.68, ringColor: PulseColors.protein),
-          _WatchTile(title: 'Water', lines: ['1.7 / 2.6 L', '+250 ml'], ring: 0.65, ringColor: PulseColors.water),
-          _WatchTile(title: 'Steps', lines: ['6,842 / 8,000'], ring: 0.86, ringColor: PulseColors.steps),
-          _WatchTile(title: 'Workout', lines: ['Upper Body', 'Set 2 of 4', 'rest 1:30'], ring: 0.4, ringColor: PulseColors.exercise),
-          _WatchTile(title: 'Quick Log', lines: ['Food', 'Water', 'Exercise'], ring: null, ringColor: PulseColors.primary),
+        Wrap(spacing: PulseSpacing.m, runSpacing: PulseSpacing.m, children: [
+          _WatchTile(title: 'Calories', lines: ['${store.foodKcal.round()} kcal', '${store.remainingKcal.round()} left'], ring: pct(store.foodKcal, g.calorieGoal), ringColor: PulseColors.accent),
+          _WatchTile(title: 'Macros', lines: ['Protein', '${store.protein.round()} / ${g.proteinGoal.round()} g'], ring: pct(store.protein, g.proteinGoal), ringColor: PulseColors.protein),
+          _WatchTile(title: 'Water', lines: ['${store.waterLogged.toStringAsFixed(1)} / ${g.waterGoalLiters.toStringAsFixed(1)} L'], ring: pct(store.waterLogged, g.waterGoalLiters), ringColor: PulseColors.water),
+          _WatchTile(title: 'Steps', lines: ['${store.stepsToday.round()} / ${g.stepGoal}'], ring: pct(store.stepsToday, g.stepGoal.toDouble()), ringColor: PulseColors.steps),
+          const _WatchTile(title: 'Quick Log', lines: ['Food', 'Water', 'Exercise'], ring: null, ringColor: PulseColors.primary),
         ]),
         const SizedBox(height: PulseSpacing.m),
         Text('Watch screens use ≥ 16 pt type, high-contrast fills and the same macro colors as phone. Complications show a single metric ring.',
@@ -72,7 +78,8 @@ class _WidgetSmall extends StatelessWidget {
 }
 
 class _WidgetMedium extends StatelessWidget {
-  const _WidgetMedium();
+  const _WidgetMedium({required this.store});
+  final PulseStore store;
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(PulseSpacing.l),
@@ -81,14 +88,14 @@ class _WidgetMedium extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Today', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70)),
             const SizedBox(height: 4),
-            const Text('1,020 kcal left', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
+            Text('${store.remainingKcal.round()} kcal left', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
             const SizedBox(height: 10),
             Row(children: [
-              _miniMacro('P', 0.68, PulseColors.protein),
+              _miniMacro('P', _pct(store.protein, store.goals.proteinGoal), PulseColors.protein),
               const SizedBox(width: 8),
-              _miniMacro('C', 0.66, PulseColors.carbs),
+              _miniMacro('C', _pct(store.carbs, store.goals.carbGoal), PulseColors.carbs),
               const SizedBox(width: 8),
-              _miniMacro('F', 0.63, PulseColors.fat),
+              _miniMacro('F', _pct(store.fat, store.goals.fatGoal), PulseColors.fat),
             ]),
           ])),
           Column(mainAxisSize: MainAxisSize.min, children: [
@@ -101,6 +108,8 @@ class _WidgetMedium extends StatelessWidget {
         ]),
       );
 
+  static double _pct(double v, double goal) => goal <= 0 ? 0 : (v / goal).clamp(0.0, 1.0);
+
   static Widget _miniMacro(String l, double v, Color c) => Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(l, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c)),
         ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: v, minHeight: 5, backgroundColor: Colors.white12, color: c)),
@@ -112,34 +121,26 @@ class _WidgetMedium extends StatelessWidget {
 }
 
 class _WidgetLarge extends StatelessWidget {
-  const _WidgetLarge();
+  const _WidgetLarge({required this.store});
+  final PulseStore store;
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(PulseSpacing.l),
         decoration: BoxDecoration(color: const Color(0xFF1B2A24), borderRadius: BorderRadius.circular(28)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('Good morning', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white)),
+            Text(fmtGreeting(DateTime.now()), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white)),
             const Spacer(),
-            const PulseRing(value: 0.74, color: PulseColors.primary, size: 34, stroke: 4,
-                child: Text('74%', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Colors.white))),
+            PulseRing(value: store.dailyScore, color: PulseColors.primary, size: 34, stroke: 4,
+                child: Text('${(store.dailyScore * 100).round()}%', style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Colors.white))),
           ]),
           const SizedBox(height: 12),
-          const Row(children: [
-            BigStatWidget('1,020', 'kcal left', PulseColors.accent),
-            BigStatWidget('92 g', 'protein', PulseColors.protein),
-            BigStatWidget('6,842', 'steps', PulseColors.steps),
-            BigStatWidget('1.7 L', 'water', PulseColors.water),
+          Row(children: [
+            BigStatWidget('${store.remainingKcal.round()}', 'kcal left', PulseColors.accent),
+            BigStatWidget('${store.protein.round()} g', 'protein', PulseColors.protein),
+            BigStatWidget('${store.stepsToday.round()}', 'steps', PulseColors.steps),
+            BigStatWidget('${store.waterLogged.toStringAsFixed(1)} L', 'water', PulseColors.water),
           ]),
-          const SizedBox(height: 14),
-          Container(height: 36,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-              child: const Row(children: [
-                SizedBox(width: 10),
-                Icon(Icons.fitness_center_rounded, color: Colors.white70, size: 15),
-                SizedBox(width: 8),
-                Text('Next: Upper Body Strength · 6:30 PM', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-              ])),
         ]),
       );
 

@@ -512,20 +512,32 @@ class WaterScreen extends StatelessWidget {
         ]),
         const SizedBox(height: PulseSpacing.l),
         SectionHeader(title: 'Today\'s sips'),
-        for (final t in const [('8:10 AM', 0.3), ('9:45 AM', 0.25), ('12:30 PM', 0.5), ('2:00 PM', 0.35), ('4:15 PM', 0.3)])
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
-            leading: const Icon(Icons.water_drop_rounded, color: PulseColors.water, size: 20),
-            title: Text('${(t.$2 * 1000).toStringAsFixed(0)} ml'),
-            subtitle: Text(t.$1),
-            trailing: IconButton(
-                tooltip: 'Remove this entry',
-                icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                onPressed: () {
-                  s.addWater(-t.$2);
-                  pulseSnack(context, 'Entry removed', undoLabel: 'Undo', onUndo: () => s.addWater(t.$2));
-                }),
-          ),
+        // §3: five invented rows sat here, each with a delete button that
+        // subtracted a volume belonging to no real entry. These are the
+        // drinks actually logged today, newest first.
+        if (s.sips.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: PulseSpacing.m),
+            child: Text('Nothing logged yet today.',
+                style: Theme.of(context).textTheme.bodyMedium),
+          )
+        else
+          for (final sip in s.sips.reversed.toList(growable: false))
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: PulseSpacing.s),
+              leading: const Icon(Icons.water_drop_rounded, color: PulseColors.water, size: 20),
+              title: Text('${(sip.liters * 1000).toStringAsFixed(0)} ml'),
+              subtitle: Text(fmtClockTime(sip.at)),
+              trailing: IconButton(
+                  tooltip: 'Remove this entry',
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  onPressed: () {
+                    s.removeSip(sip);
+                    pulseSnack(context, 'Entry removed',
+                        undoLabel: 'Undo',
+                        onUndo: () => s.logSip(sip.liters, now: sip.at));
+                  }),
+            ),
       ]),
     );
   }

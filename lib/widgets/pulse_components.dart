@@ -669,8 +669,11 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // §2.1: the column is taller than a short screen at a large text
+    // scale, so it scrolls rather than overflowing — an empty state that
+    // overflows is the one thing it must never do.
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(PulseSpacing.xxl),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
