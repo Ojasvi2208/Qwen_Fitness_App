@@ -35,12 +35,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- AdMob application id. Google's published TEST id by default so a
-             debug build cannot serve or bill real inventory; the release
-             build must override this with the real id (§61). -->
+        <!-- AdMob application id (§61). Resolved per build type from
+             android/app/build.gradle: the real PulseFit id in release, and
+             Google's published TEST id in debug, so a development build can
+             never serve or bill real inventory. The manifest cannot hold
+             both, so the value comes from a manifest placeholder. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="${admobAppId}"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -69,18 +69,36 @@ so skip it. Add it later if a domain appears.
 
 ---
 
-## 5. Hand the two ids over
+## 5. The live ids — wired 2026-10-01
 
-Neither is a secret — both ship inside every APK and can be read out of any
-install. Paste them in chat and they get wired in two files:
+Neither is a secret; both ship inside every APK and can be read out of any
+install.
 
-| Id | Goes in |
-|---|---|
-| App ID (`~`) | `android/app/src/main/AndroidManifest.xml` |
-| Banner unit ID (`/`) | `AdUnitIds` (`lib/data/platform/`) |
+| Id | Value | Where |
+|---|---|---|
+| App ID | `ca-app-pub-2404540193833318~2299056313` | `build.gradle` manifest placeholder, release build type |
+| Banner unit | `ca-app-pub-2404540193833318/6131499270` | `--dart-define=PULSE_AD_BANNER_ID` |
 
-A release build must override both — the test ids are the default precisely so
-a debug build never serves live ads.
+The app id resolves **per build type**: the real id in release, Google's test
+id in debug. A development build therefore cannot serve or bill live
+inventory, which would be an AdMob policy problem rather than merely noisy
+data.
+
+The banner id is read by `AdUnitIds.fromEnvironment()` and falls back to the
+test banner when the define is absent — so **a release build without the
+define silently ships test ads and earns nothing.** Always build with:
+
+```bash
+flutter build appbundle --release \
+  --dart-define=PULSE_PLATFORM_SERVICES=true \
+  --dart-define=PULSE_AD_BANNER_ID=ca-app-pub-2404540193833318/6131499270
+```
+
+`AdUnitIds.isTestInventory` reports which set a build ended up with.
+
+New ad units take up to an hour to start serving, and a brand-new AdMob
+account can show blank ads for longer while it is reviewed. A blank banner
+immediately after setup is expected, not a bug.
 
 ---
 
