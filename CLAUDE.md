@@ -105,6 +105,13 @@ Plain prose matching the existing log. **Never** a `Co-Authored-By` trailer, and
 never a mention of Claude, Anthropic or any other AI tool. Explain *why*, not
 just what.
 
+## Next work
+
+[docs/PHASE7_QA_AUTOMATION_PLAN.md](docs/PHASE7_QA_AUTOMATION_PLAN.md) is the
+current plan: five verified UI defects (D1–D5), a golden-image layer to catch
+overflow and overstretch, and an integration suite for the critical journeys.
+[docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md) has the full state.
+
 ## Phase 6
 
 `in_app_purchase`, `google_mobile_ads` and `flutter_local_notifications` are
