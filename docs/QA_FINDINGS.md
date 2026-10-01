@@ -1,0 +1,163 @@
+# PULSE — Phase 7 QA findings
+
+Written for: whoever reviews or continues the Phase 7 remediation.
+Status: **Steps 1 and 2 complete.** Step 3 (the responsive refactor) is the
+next work item and its scope is the O-series table below.
+
+Gate at every commit so far: `flutter analyze` 0 errors, `flutter test` all
+passing. Figures in this document are console output, not estimates.
+
+---
+
+## 1. Step 1 — defects fixed
+
+Each carries a regression case in [test/ui_fit_test.dart](../test/ui_fit_test.dart)
+that sizes the test surface to a real device **before** pumping, because the
+800×600 default is wider and shorter than any phone and is precisely why 235
+passing cases never saw any of this.
+
+| # | Defect | Root cause | Fix |
+|---|---|---|---|
+| D1 | Avatar read "AM" beside the name "Ojasvi" | `PulseAvatar` defaulted `initials = 'AM'`, a leftover of the sample profile removed in Phase 5 | `initials` is now required so no stale default can outlive its data; `pulseInitials()` derives them; an empty profile renders a neutral icon, never invented letters |
+| D2 | Centre FAB covered the Train tab | `centerDocked` over a five-destination `NavigationBar` puts the FAB on the middle destination | `endFloat`. Five tabs and the bar are untouched |
+| D3 | Quick Log sheet overflowed by 176 px | 8 items in a 65 %-height cap, `shrinkWrap`, no scroll | `tall: true` plus a scrolling `Flexible` list, so a larger text scale cannot overflow it either |
+| D4 | Notification permission could not be granted | `POST_NOTIFICATIONS` absent from the manifest; Android 13+ refuses the runtime request without it | Declared in `AndroidManifest.xml` |
+| D6 | **New.** `MacroRow` overflowed by 62 px | Label and value both unconstrained in a `Row` | Label is `Expanded` and ellipsises; the number keeps its space |
+
+D6 was found by the *first* test written at 360 px width, before any harness
+existed. That is the entire argument for Step 2.
+
+### C1 / C4 — fabricated data
+
+Scope agreed with the project owner: fix what a user cannot avoid seeing on a
+fresh install; size the rest as follow-up (§3 below).
+
+Fixed: the greeting said "Good morning" at every hour and dated itself
+29 September forever; the diary's whole date axis was three literals pinned to
+that date; the Today steps card drew a seven-bar week from a `const` list; the
+habit chips named progress strings no store field feeds; the insight strip
+asserted a protein streak on an empty profile; the Train hero typed "45 min /
+Intermediate / 8 exercises" beside a hard-coded name; two seven-bar charts on
+Activity and Nutrition Progress presented invented weeks.
+
+Date formatting now lives in `common.dart` beside the other `fmt*` helpers
+(`fmtLongDate`, `fmtMediumDate`, `fmtShortDate`, `fmtGreeting`) — there is no
+`intl` dependency in this project and adding one for four format strings was
+not worth the lock-file churn.
+
+Where no history exists the screen says so, reusing the `EmptyState` wording
+`StepsScreen` already had for exactly this case. **Nothing in this app records
+a daily step or calorie series** — the store holds `stepsToday` and `foodKcal`
+and no more — so those charts could not be drawn honestly at all.
+
+---
+
+## 2. Step 2 — the golden harness, and what it found
+
+[test/golden/device_profiles.dart](../test/golden/device_profiles.dart) is a
+hand-rolled device matrix (no `golden_toolkit`: this project carries no test
+dependency beyond `flutter_test` and writes its own doubles).
+[test/golden/overflow_sweep_test.dart](../test/golden/overflow_sweep_test.dart)
+renders 16 screens across the §2.1 matrix.
+
+The overflow assertion is the primary gate rather than image diffing, because
+**a golden only fails once a person looks at the diff, while a `RenderFlex`
+overflow throws and can fail the build on its own.**
+
+### Result
+
+```
+160 renders · 117 passed · 43 failed
+97 RenderFlex overflows, the largest 281 px
+```
+
+**43 of 160 renders overflow.** The plan predicted this step would surface more
+than the five known defects; it surfaced nine distinct root-cause sites.
+
+### O-series — the Step 3 scope
+
+Nine sites account for all 97 overflows. Every one is the same shape as D6: an
+unconstrained `Text` inside a `Row`.
+
+| # | Site | Overflows | Screens affected |
+|---|---|---|---|
+| O1 | [progress_screens.dart:943](../lib/screens/progress/progress_screens.dart#L943) — goal `ListTile` trailing `Row` | 16 | Goals |
+| O2 | [progress_screens.dart:942](../lib/screens/progress/progress_screens.dart#L942) — the same tile's title | 12 | Goals |
+| O3 | [progress_screens.dart:915](../lib/screens/progress/progress_screens.dart#L915) — "adjust goals" card | 12 | Goals |
+| O4 | [common.dart:369](../lib/widgets/common.dart#L369) — `TrendIndicator` label row | 8 | Progress, Weight progress |
+| O5 | [progress_screens.dart:170](../lib/screens/progress/progress_screens.dart#L170) — weight chart legend row | 8 | Weight progress |
+| O6 | [pulse_components.dart:56](../lib/widgets/pulse_components.dart#L56) | 4 | several |
+| O7 | [train_screens.dart:76](../lib/screens/train/train_screens.dart#L76) | 3 | Train |
+| O8 | [train_screens.dart:80](../lib/screens/train/train_screens.dart#L80) | 1 | Train |
+| O9 | [premium_screens.dart:139](../lib/screens/profile/premium_screens.dart#L139) | 1 | Subscription |
+
+### Worst profiles
+
+`phone_small` (320×568) and `phone_moto` at textScale 1.5 fail the most, which
+is the matrix doing its job: the smallest realistic Android and the reported
+device under accessibility stress. Five screens fail on **both** —
+Diary, Goals, Train, Weight progress and Subscription.
+
+Notably `tablet` (768×1024) also fails on Weight progress, so this is not
+purely a narrow-screen problem; O5's legend row is wide regardless.
+
+### Goldens proper
+
+Not yet committed. The O-series fixes will churn every image, so approving
+~120 goldens before Step 3 would mean approving 43 renders with visible
+overflow stripes baked in as the reference. The overflow gate is green-or-red
+on its own and is the useful half today; images are worth committing once the
+O-series is closed.
+
+---
+
+## 3. Known-fabricated screens — not fixed, deliberately
+
+Eight screens remain invented end to end. Each needs either store wiring or an
+empty state, and each is a user-visible falsehood of the same class as the
+removed sample profile.
+
+| Screen | What it claims |
+|---|---|
+| `WeeklyReportScreen` | every row — "58,420 steps", "5 / 7 protein days", "Sep 21–27" |
+| `StreaksScreen` | "7-day streak", earned/unearned badges, "18 of the last 21 days" |
+| `ActivityDetailScreen` | "5.26 km", "31:42", "146 bpm", plus a painted fake GPS route |
+| `WidgetsWatchScreen` | every tile value |
+| `_ProgressCalendar`, `_HistoryCalendar` | activity dots from `d % 3 == 0` arithmetic |
+| `WaterScreen` "Today's sips" | five fake timestamped entries, each with a working delete button |
+| `NotificationsScreen` | "You've completed 20 workouts" |
+| onboarding `_planPage` | "2,050 kcal" under the words "Built from your answers" |
+
+`PulseData.habits`, `.insights`, `.notifications`, `.achievements` and
+`.weeklyStepChart` are the shared sources behind several of these.
+
+**Risk if Step 2's goldens are approved before this is addressed:** the
+fabricated figures become the approved reference images, and a later honest fix
+then reads as a regression.
+
+---
+
+## 4. Outstanding from the plan
+
+- **Step 3** — the O-series above, then C2 (magic numbers), C3 (duplicated
+  string literals), C5 (force-unwrap audit).
+- **Steps 4–5** — integration suite, Tier 1–3 flow cases. Note `adb screencap`
+  returns black frames on the Moto Edge 30; use the `integration_test`
+  screenshot API.
+- **C6** — 13 warnings, ~239 info lints, all pre-existing. Sweep in its own
+  commit.
+- **C7** — `android/app/build.gradle` still signs release with the debug key
+  and carries the generated `applicationId`. Blocks a real release.
+- **PR into `main`** — `master` is ahead; `gh` is not authenticated here.
+
+## 5. Device verification
+
+The debug APK was built, installed and launched on the physical Moto Edge 30
+(`ZD2228PZYT`) after the Step 1 commits: process alive, no `FATAL`, no
+`AndroidRuntime` crash, no overflow in `logcat`. The device detached from `adb`
+before the per-screen walkthrough was finished, so **the Step 1 fixes are
+verified as "the app starts and logs nothing bad", not yet as "a person
+confirmed each of the five surfaces by eye."** That walkthrough is still owed.
+
+A passing suite has missed a startup crash, a permanent spinner and three
+keyboard failures in this project. Launching the app remains non-optional.
