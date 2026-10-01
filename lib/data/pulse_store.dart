@@ -131,8 +131,12 @@ class PulseStore extends ChangeNotifier {
   /// route: no profile yet → onboarding rather than the dashboard.
   bool get hasProfile => userName.isNotEmpty;
 
-  /// Default targets shown while the goal step is still open; onboarding
-  /// overwrites them from the user's own details (§14 step 9).
+  /// Starting targets, held only until onboarding computes the user's own
+  /// from their details (§14 step 9, see energy_plan.dart). Generic on
+  /// purpose: they are what a profile-less install shows, never a claim
+  /// about anybody. The previous comment here said onboarding overwrote
+  /// them, which was false until N3 was fixed — setTargets had no carb or
+  /// fat parameter at all, so these survived the whole flow.
   final Goals goals = Goals(
     calorieGoal: 2000, proteinGoal: 120, carbGoal: 200, fatGoal: 65,
     waterGoalLiters: 2.5, stepGoal: 8000, targetWeightKg: 0, workoutsPerWeek: 3,

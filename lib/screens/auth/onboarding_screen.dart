@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import '../../data/energy_plan.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pulse_components.dart';
@@ -72,7 +73,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       heightCm: double.tryParse(_height.text),
       startWeightKg: weight,
     );
-    store.setTargets(targetWeightKg: _targetWeight);
+    // N3: setTargets could only ever write calories and protein — there
+    // were no carb or fat parameters — so the store's defaults survived
+    // onboarding and the comment above them claiming otherwise was false.
+    // updateGoals is the only path that writes all of them.
+    final plan = _plan;
+    store.updateGoals((g) {
+      g.calorieGoal = plan.calorieGoal;
+      g.proteinGoal = plan.proteinGoal;
+      g.carbGoal = plan.carbGoal;
+      g.fatGoal = plan.fatGoal;
+      g.waterGoalLiters = plan.waterGoalLiters;
+      g.stepGoal = plan.stepGoal;
+      g.targetWeightKg = _targetWeight;
+    });
     // First weigh-in: seeds the trend from the user's own entry.
     if (weight != null) store.logWeight(weight);
   }
@@ -277,7 +291,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           OptionTile(title: d, selected: _diet == d, onTap: () => setState(() => _diet = d)),
       ]);
 
+  /// N3: the plan page used to show 2,050 kcal and its macros as literals
+  /// while claiming "Built from your answers". Both the page and the
+  /// commit now read this, so what the user is shown is what is stored.
+  PulseEnergyPlan get _plan => PulseEnergyPlan.from(
+        sex: _sex == 'Male' ? BiologicalSex.male : BiologicalSex.female,
+        ageYears: int.tryParse(_age.text) ?? 30,
+        heightCm: double.tryParse(_height.text) ?? 170,
+        weightKg: double.tryParse(_weight.text) ?? 70,
+        activity: ActivityLevel.values[_activity.clamp(0, 3)],
+        pace: WeightPace.values[_pace.clamp(0, 2)],
+        targetWeightKg: _targetWeight,
+      );
+
   Widget _planPage(BuildContext c) {
+    final plan = _plan;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _heading(c, 'Your daily plan is ready',
           'Built from your answers — ${goals.join(", ").toLowerCase()}. Every number below stays editable in My Goals.'),
@@ -286,10 +314,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Daily Calories', style: Theme.of(c).textTheme.titleMedium),
-            Text('2,050 kcal', style: PulseTypography.metricMedium.copyWith(color: Theme.of(c).colorScheme.primary)),
+            Text('${plan.calorieGoal.toStringAsFixed(0)} kcal', style: PulseTypography.metricMedium.copyWith(color: Theme.of(c).colorScheme.primary)),
           ]),
           const Divider(height: PulseSpacing.xl),
-          for (final m in [('Protein', '135 g', PulseColors.protein, Icons.bolt_rounded), ('Carbs', '220 g', PulseColors.carbs, Icons.grain_rounded), ('Fat', '70 g', PulseColors.fat, Icons.water_drop_rounded)])
+          for (final m in [
+            ('Protein', '${plan.proteinGoal.toStringAsFixed(0)} g', PulseColors.protein, Icons.bolt_rounded),
+            ('Carbs', '${plan.carbGoal.toStringAsFixed(0)} g', PulseColors.carbs, Icons.grain_rounded),
+            ('Fat', '${plan.fatGoal.toStringAsFixed(0)} g', PulseColors.fat, Icons.water_drop_rounded),
+          ])
             Padding(
               padding: const EdgeInsets.symmetric(vertical: PulseSpacing.sm),
               child: Row(children: [
@@ -303,17 +335,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const Icon(Icons.water_drop_rounded, size: 18, color: PulseColors.water),
             const SizedBox(width: PulseSpacing.s),
             Expanded(child: Text('Water', style: Theme.of(c).textTheme.bodyLarge)),
-            Text('2.6 L', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
+            Text('${plan.waterGoalLiters.toStringAsFixed(1)} L', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
           ]),
           const SizedBox(height: PulseSpacing.sm),
           Row(children: [
             const Icon(Icons.directions_walk_rounded, size: 18, color: PulseColors.steps),
             const SizedBox(width: PulseSpacing.s),
             Expanded(child: Text('Steps', style: Theme.of(c).textTheme.bodyLarge)),
-            Text('8,000', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
+            Text('${plan.stepGoal}', style: PulseTypography.metricSmall.copyWith(color: Theme.of(c).colorScheme.onSurface)),
           ]),
         ]),
       ),
+      // The pace the user picked could not be met safely, so say so
+      // rather than showing a capped number as if it were what they chose.
+      if (plan.floorNote != null) ...[
+        const SizedBox(height: PulseSpacing.m),
+        Container(
+          padding: const EdgeInsets.all(PulseSpacing.m),
+          decoration: BoxDecoration(
+              color: Theme.of(c).colorScheme.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(PulseRadius.m)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.info_outline_rounded, size: 18, color: Theme.of(c).colorScheme.primary),
+            const SizedBox(width: PulseSpacing.s),
+            Expanded(child: Text(plan.floorNote!, style: Theme.of(c).textTheme.bodySmall?.copyWith(fontSize: 13.5, height: 1.45))),
+          ]),
+        ),
+      ],
       const SizedBox(height: PulseSpacing.l),
       SecondaryButton(label: 'Adjust Goals', icon: Icons.tune_rounded, onTap: () => Navigator.of(c).pushNamed('/goals')),
       const SizedBox(height: PulseSpacing.s),
